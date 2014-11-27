@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
-	sim "wiless/research/simulations"
+	sim "wiless/cellular"
 	"wiless/vlib"
 )
 

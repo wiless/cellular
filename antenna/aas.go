@@ -19,7 +19,6 @@ var Radius float64 = 1
 var imagval complex128 = 0 + 1i
 
 var freq float64 = 2.0e9
-var Lamda float64
 var cspeed float64 = 3.0e8
 var mfileName string
 
@@ -61,7 +60,7 @@ func (s *SettingAAS) SetDefault() {
 	s.VBeamWidth = 65
 	s.SLAV = 30.0
 	s.lamda = cspeed / freq
-	s.ESpacingHFactor = 0 /// Factor mulplied by Lamda
+	s.ESpacingHFactor = 0 /// Factor mulplied by params.lamda
 	s.ESpacingVFactor = .5
 }
 
@@ -127,7 +126,7 @@ func (params *SettingAAS) CreateElements(centre vlib.Location3D) {
 func (params *SettingAAS) AASGain(dest vlib.Location3D) (gain float64, effectiveThetaH, effectiveThetaV float64) {
 	// src := params.MyLocation()
 
-	Lamda = cspeed / params.Freq
+	params.lamda = cspeed / params.Freq
 	AntennaElementLocations := vlib.ToVectorC(params.elementLocations)
 	w := vlib.NewOnesC(params.N)
 	w = w.Scale(1.0 / float64(params.N))
@@ -141,7 +140,7 @@ func (params *SettingAAS) AASGain(dest vlib.Location3D) (gain float64, effective
 		dist, thetaH, thetaV := vlib.RelativeGeo(params.elementLocations[i], dest)
 		// dist= cmplx.Abs(params.elementLocations[i].Cmplx()-dest.Cmplx())
 		aGain := complex((params.ElementEffectiveGain(thetaH, thetaV)), 0)
-		_, phaseDelay[i] = math.Modf(vlib.ToDegree(dist / Lamda))
+		_, phaseDelay[i] = math.Modf(vlib.ToDegree(dist / params.lamda))
 		Rxcomponent += GetEJtheta(phaseDelay[i]) * w[i] * aGain
 	}
 	gain = math.Pow(cmplx.Abs(Rxcomponent), 2)
@@ -160,8 +159,8 @@ func RunAAS(params SettingAAS) {
 	// flag.Parse()
 	// TiltAngle = params.VTiltAngle
 
-	Lamda = cspeed / freq
-	AntennaElementLocations := dropLinearNodes(N, Lamda/2.0, 0)
+	params.lamda = cspeed / freq
+	AntennaElementLocations := dropLinearNodes(N, params.lamda/2.0, 0)
 	// WeightVector := vlib.NewVectorF(N)
 	// for i := 0; i < N; i++ {
 	// 	WeightVector[i] = rand.Float64() * 2 * math.Pi
@@ -173,7 +172,7 @@ func RunAAS(params SettingAAS) {
 	rotateTilt := cmplx.Exp(complex(0, -(params.VTiltAngle)*math.Pi/180.0))
 	AntennaElementLocations = AntennaElementLocations.ScaleC(rotateTilt)
 
-	WeightVector := FindWeights(params.BeamTilt, AntennaElementLocations)
+	WeightVector := params.FindWeights(params.BeamTilt, AntennaElementLocations)
 	if params.DisableBeamTit {
 		WeightVector = vlib.NewOnesC(AntennaElementLocations.Size())
 	}
@@ -196,7 +195,7 @@ func RunAAS(params SettingAAS) {
 		phaseDelay := vlib.NewVectorF(AntennaElementLocations.Size())
 		for eindx, epos := range AntennaElementLocations {
 			dist := cmplx.Abs(epos - pos)
-			_, phaseDelay[eindx] = math.Modf(dist / Lamda)
+			_, phaseDelay[eindx] = math.Modf(dist / params.lamda)
 			phaseDelay[eindx] *= (2.0 * math.Pi) //+ WeightVector[eindx]
 			jtheta := complex(0.0, phaseDelay[eindx])
 			directionGain := math.Sqrt(params.ElementDirectionGain(cmplx.Phase(pos - epos)))
@@ -253,14 +252,14 @@ func Radian(degree float64) float64 {
 	return degree * math.Pi / 180.0
 }
 
-func FindWeights(theta float64, AE vlib.VectorC) vlib.VectorC {
+func (params *SettingAAS) FindWeights(theta float64, AE vlib.VectorC) vlib.VectorC {
 	// for nindx, pos := range NodeLocations {
 
 	WeightVectors := vlib.NewVectorC(AE.Size())
 
 	for i := 0; i < AE.Size(); i++ {
 		m := float64(i)
-		arg := complex(0, 2*math.Pi*(m-1)*Lamda/2.0*math.Cos(Radian(theta+90))/Lamda)
+		arg := complex(0, 2*math.Pi*(m-1)*params.lamda/2.0*math.Cos(Radian(theta+90))/params.lamda)
 		WeightVectors[i] = cmplx.Exp(arg)
 	}
 	return WeightVectors
@@ -272,7 +271,7 @@ func FindWeights(theta float64, AE vlib.VectorC) vlib.VectorC {
 	phaseDelay := vlib.NewVectorF(AE.Size())
 	for eindx, epos := range AE {
 		dist := cmplx.Abs(epos - pos)
-		_, phaseDelay[eindx] = math.Modf(dist / Lamda)
+		_, phaseDelay[eindx] = math.Modf(dist / params.lamda)
 		phaseDelay[eindx] *= (2.0 * math.Pi)
 		WeightVectors[eindx] = cmplx.Exp(complex(0.0, -phaseDelay[eindx]))
 
