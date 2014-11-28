@@ -46,6 +46,7 @@ type SettingAAS struct {
 	SLAV                             float64
 	ESpacingVFactor, ESpacingHFactor float64
 	Centre                           vlib.Location3D `json:-`
+	weightVector                     vlib.VectorC
 }
 
 func (s *SettingAAS) SetDefault() {
@@ -119,8 +120,8 @@ func (params *SettingAAS) CreateElements(centre vlib.Location3D) {
 		rotatedpos := params.elementLocations[i].Cmplx() * rotateTilt
 		params.elementLocations[i].FromCmplx(rotatedpos)
 	}
-
 	// fmt.Printf("\n AAS Elem %d locations :  %v", params.N, params.elementLocations)
+	params.weightVector = params.FindWeights(params.BeamTilt)
 }
 
 func (params *SettingAAS) AASGain(dest vlib.Location3D) (gain float64, effectiveThetaH, effectiveThetaV float64) {
@@ -128,6 +129,7 @@ func (params *SettingAAS) AASGain(dest vlib.Location3D) (gain float64, effective
 
 	params.lamda = cspeed / params.Freq
 	AntennaElementLocations := vlib.ToVectorC(params.elementLocations)
+
 	w := vlib.NewOnesC(params.N)
 	w = w.Scale(1.0 / float64(params.N))
 	// fmt.Print(AntennaElementLocations)
@@ -172,7 +174,7 @@ func RunAAS(params SettingAAS) {
 	rotateTilt := cmplx.Exp(complex(0, -(params.VTiltAngle)*math.Pi/180.0))
 	AntennaElementLocations = AntennaElementLocations.ScaleC(rotateTilt)
 
-	WeightVector := params.FindWeights(params.BeamTilt, AntennaElementLocations)
+	WeightVector := params.FindWeights(params.BeamTilt)
 	if params.DisableBeamTit {
 		WeightVector = vlib.NewOnesC(AntennaElementLocations.Size())
 	}
@@ -252,19 +254,10 @@ func Radian(degree float64) float64 {
 	return degree * math.Pi / 180.0
 }
 
-func (params *SettingAAS) FindWeights(theta float64, AE vlib.VectorC) vlib.VectorC {
-	// for nindx, pos := range NodeLocations {
-
-	WeightVectors := vlib.NewVectorC(AE.Size())
-
-	for i := 0; i < AE.Size(); i++ {
-		m := float64(i)
-		arg := complex(0, 2*math.Pi*(m-1)*params.lamda/2.0*math.Cos(Radian(theta+90))/params.lamda)
-		WeightVectors[i] = cmplx.Exp(arg)
-	}
-	return WeightVectors
-
+func (params *SettingAAS) oldFindWeights(theta float64) vlib.VectorC {
+	WeightVectors := vlib.NewVectorC(params.N)
 	// var gain complex128
+	AE := vlib.ToVectorC(params.elementLocations)
 	meanpos := vlib.MeanC(AE)
 	pos := GetEJtheta(theta) + meanpos
 	// gain := complex(1.0/math.Sqrt(float64(N)), 0)
@@ -277,6 +270,19 @@ func (params *SettingAAS) FindWeights(theta float64, AE vlib.VectorC) vlib.Vecto
 
 	}
 	return WeightVectors
+}
+func (params *SettingAAS) FindWeights(theta float64) vlib.VectorC {
+	// for nindx, pos := range NodeLocations {
+
+	WeightVectors := vlib.NewVectorC(params.N)
+
+	for i := 0; i < params.N; i++ {
+		m := float64(i)
+		arg := complex(0, 2*math.Pi*(m-1)*params.lamda/2.0*math.Cos(Radian(theta+90))/params.lamda)
+		WeightVectors[i] = cmplx.Exp(arg)
+	}
+	return WeightVectors
+
 }
 
 func (s SettingAAS) ElementDirectionHGain(degree float64) float64 {
