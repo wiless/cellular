@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"math/rand"
 	sim "wiless/cellular"
@@ -253,6 +254,7 @@ func (d *DropSystem) Init() {
 	d.dDropSetting.Init()
 	d.Nodes = make(map[int]*Node)
 	count := 0
+
 	for indx, _ := range d.NodeTypes {
 		d.NodeTypes[indx].startID = count
 		d.NodeTypes[indx].nodeIDs.Resize(d.NodeTypes[indx].Count)
@@ -278,6 +280,8 @@ func (d *DropSystem) GetNodeType(ntype string) *NodeType {
 	if indx != -1 {
 		return &d.NodeTypes[indx]
 	} else {
+		log.Panicln("DropSystem::GetNodeType() : No Such Type ", ntype)
+
 		return nil
 	}
 }
@@ -294,18 +298,23 @@ func (d *DropSystem) DropNodeType(nodetype string) {
 	// ntype.startID = d.lastID
 
 	// if circular
-	// switch d.CoverageRegion.CellType {
-	// case Circular:
-	radius := d.CoverageRegion.Dimensions[0]
-	locations := CircularPoints(complex(0, 0), radius, N)
+	switch d.CoverageRegion.Celltype {
+	case Circular:
 
-	//fmt.Printf("\n %s has %d Locations = %v", nodetype, N, locations)
+		radius := d.CoverageRegion.Dimensions[0]
+		locations := CircularPoints(complex(0, 0), radius, N)
+		d.SetAllNodeLocation(nodetype, locations)
 
-	d.SetAllNodeLocation(nodetype, locations)
-	// case Rectangular:
-	// default:
-	// else
-	// }
+	case Rectangular:
+		length := d.CoverageRegion.Dimensions[0]
+		locations := RectangularNPoints(complex(0, 0), length, length, 0, N)
+		d.SetAllNodeLocation(nodetype, locations)
+	default:
+		radius := d.CoverageRegion.Dimensions[0]
+		locations := CircularPoints(complex(0, 0), radius, N)
+		d.SetAllNodeLocation(nodetype, locations)
+
+	}
 }
 
 func (d *DropSystem) Locations(ntype string) vlib.VectorC {
@@ -344,9 +353,9 @@ func (d *DropSystem) SetNodeLocationOf(ntype string, nodeIDs vlib.VectorI, locat
 func (d *DropSystem) SetAllNodeLocation(ntype string, locations vlib.VectorC) {
 	notype := d.GetNodeType(ntype)
 
-	fmt.Println("No. of Total Nodes is ", len(d.Nodes))
-	fmt.Println("No. of Locations is ", locations.Size())
-	fmt.Println("No. of NodeIDs is ", notype)
+	// fmt.Println("No. of Total Nodes is ", len(d.Nodes))
+	// fmt.Println("No. of Locations is ", locations.Size())
+	// fmt.Println("No. of NodeIDs is ", notype)
 	for indx, val := range notype.nodeIDs {
 		d.Nodes[val].Location.FromCmplx(locations[indx])
 	}
@@ -488,7 +497,7 @@ func CircularCoverage(radius float64) Area {
 }
 
 func RectangularCoverage(length float64) Area {
-	return Area{Hexagonal, vlib.VectorF{length, length}}
+	return Area{Rectangular, vlib.VectorF{length, length}}
 }
 
 func (d *DropSystem) GetNodeIDs(ntype string) vlib.VectorI {

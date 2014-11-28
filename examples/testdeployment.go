@@ -27,35 +27,32 @@ func SingleCellDeploy(system *deployment.DropSystem) {
 	temp := deployment.NewDropSetting()
 	temp.SetDefaults()
 
-	CellRadius := 100.0
+	CellRadius := 1500.0
 	AreaRadius := CellRadius * 3.0
-	setting.SetCoverage(deployment.CircularCoverage(AreaRadius))
+	setting.SetCoverage(deployment.RectangularCoverage(AreaRadius))
 
 	WAPNodes := 10
 	NCluster := 5
 	ClusterSize := 10
 
-	setting.AddNodeType(deployment.NodeType{Name: "BS", Hmin: 20.0, Hmax: 20.0, Count: 2})
-	setting.AddNodeType(deployment.NodeType{Name: "UE", Hmin: 0.0, Hmax: 10.0, Count: 500})
+	setting.AddNodeType(deployment.NodeType{Name: "BS", Hmin: 20.0, Hmax: 20.0, Count: 1})
+	setting.AddNodeType(deployment.NodeType{Name: "UE", Hmin: 0.0, Hmax: 0.0, Count: 2500})
 	setting.AddNodeType(deployment.NodeType{Name: "WAP", Hmin: 0.0, Hmax: 0.0, Count: WAPNodes})
 	setting.AddNodeType(deployment.NodeType{Name: "PICO", Hmin: 0.0, Hmax: 0.0, Count: NCluster * ClusterSize})
 	setting.AddNodeType(deployment.NodeType{Name: "NOKIA", Hmin: 5, Hmax: 5, Count: 30})
 	/// You can save the settings of this deployment by uncommenting this line
-	vlib.SaveStructure(setting, "nodetype.txt", true)
-
 	system.SetSetting(setting)
-
 	system.Init()
 	setting.SetTxNodeNames("BS", "WAP", "PICO")
 	setting.SetRxNodeNames("UE")
+	vlib.SaveStructure(setting, "nodetype.txt", true)
 
 	/// Drop UE Nodes
-
 	system.DropNodeType("BS")
 	/// Drops the UE in the default coverage mode i.e. Circular Coverage as set above
 	system.DropNodeType("UE")
-	fmt.Printf("\nUE = %f", system.Locations("UE"))
-	fmt.Printf("\nBS = %f", system.Locations("BS"))
+	// fmt.Printf("\nUE = %f", system.Locations("UE"))
+	// fmt.Printf("\nBS = %f", system.Locations("BS"))
 
 	/// Custom dropping of nodes
 	var wlocation vlib.VectorC
@@ -124,6 +121,18 @@ func SingleCellDeploy(system *deployment.DropSystem) {
 text(real(bs(k)),imag(bs(k)),'BS')    
 end`
 	matlab.Q(looptxt)
+
+	/// Plot scatter
+	scattercmd := `figure;C=colormap;
+	deltaRssi=80/64;
+	deltasize=80/14;
+	S=floor((rssi+110)/deltasize);
+cindx=floor(rssi/deltaRssi);
+scatter3(real(ue),imag(ue),rssi,64,cindx,'filled');
+colorbar;
+view(2)
+`
+	matlab.Q(scattercmd)
 	matlab.AddText(wappos, "WAPcentre")
 
 	/// MOVING BS on HEX co-ords
@@ -162,9 +171,14 @@ func main() {
 	// modelsett:=pathloss.NewModelSettingi()
 	var model pathloss.PathLossModel
 	model.ModelSetting.SetDefault()
-
+	model.ModelSetting.Param[0] = 4
 	SingleCellDeploy(&singlecell)
 	ueLinkInfo := CalculatePathLoss(&singlecell, &model)
+	rssi := vlib.NewVectorF(len(ueLinkInfo))
+	for indx, val := range ueLinkInfo {
+		rssi[indx] = val.MinPathLos[0]
+	}
+	matlab.Export("rssi", rssi)
 	matlab.ExportStruct("LinkInfo", ueLinkInfo)
 
 	// matlab.ExportStruct("nodeTypes", singlecell.GetTxNodeNames())
@@ -186,7 +200,10 @@ func CalculatePathLoss(singlecell *deployment.DropSystem, model *pathloss.PathLo
 	templateAAS := antenna.NewAAS()
 	templateAAS.SetDefault()
 	templateAAS.N = 8
-
+	templateAAS.BeamTilt = 0
+	templateAAS.HTiltAngle = -35
+	templateAAS.VTiltAngle = 10
+	templateAAS.DisableBeamTit = false
 	txNodeNames := singlecell.GetTxNodeNames()
 	txNodeNames = []string{"BS"}
 
@@ -230,7 +247,7 @@ func CalculatePathLoss(singlecell *deployment.DropSystem, model *pathloss.PathLo
 					// f("%d  %v  %v distance = %v", i, src, rxlocs[k], rxlocs[k]-src)
 					// matstr := fmt.Sprintf("Distance(%d,%d)", rxnodeId+1, k+1)
 					totalGain := vlib.Db(aasgain) - lossDb
-					fmt.Printf("\n(%s,%d)PL, Gain = %f %f %f", name, k, lossDb, aasgain, totalGain)
+					// fmt.Printf("\n(%s,%d)PL, Gain = %f %f %f", name, k, lossDb, aasgain, totalGain)
 					allpathlossPerTxType[k] = totalGain
 
 					// fmt.Printf("\n Distance %f : loss %f dB", distance, lossDb)
