@@ -364,7 +364,7 @@ func (d *DropSystem) SetNodeLocation(ntype string, nid int, location complex128)
 	notype := d.GetNodeType(ntype)
 	val := notype.nodeIDs[nid]
 	d.Nodes[val].Location.FromCmplx(location)
-	d.Nodes[val].Location.SetHeight(d.Nodes[val].Height)
+	// d.Nodes[val].Location.SetHeight(d.Nodes[val].Height)
 
 }
 func (d *DropSystem) SetNodeLocationOf(ntype string, nodeIDs vlib.VectorI, locations vlib.VectorC) {
