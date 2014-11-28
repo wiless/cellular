@@ -315,6 +315,28 @@ func (d *DropSystem) DropNodeType(nodetype string) {
 		d.SetAllNodeLocation(nodetype, locations)
 
 	}
+	d.PopulateHeight(nodetype)
+}
+
+func (d *DropSystem) PopulateHeight(ntype string) {
+
+	notype := d.GetNodeType(ntype)
+	var random bool = false
+	var height float64
+	height = notype.Hmin
+	if notype.Hmax != notype.Hmin {
+		random = true
+	}
+
+	// result := vlib.NewVectorC(notype.Count)
+	Hrange := notype.Hmax - notype.Hmin
+	for i := 0; i < notype.nodeIDs.Size(); i++ {
+		if random {
+			height = Hrange*rand.Float64() + notype.Hmin
+		}
+		d.Nodes[notype.nodeIDs[i]].Location.SetHeight(height)
+	}
+
 }
 
 func (d *DropSystem) Locations(ntype string) vlib.VectorC {

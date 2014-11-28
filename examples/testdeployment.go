@@ -14,6 +14,8 @@ import (
 
 var matlab *vlib.Matlab
 
+var templateAAS *antenna.SettingAAS
+
 type LinkInfo struct {
 	RxID           int
 	NodeTypes      []string
@@ -36,7 +38,7 @@ func SingleCellDeploy(system *deployment.DropSystem) {
 	ClusterSize := 10
 
 	setting.AddNodeType(deployment.NodeType{Name: "BS", Hmin: 20.0, Hmax: 20.0, Count: 1})
-	setting.AddNodeType(deployment.NodeType{Name: "UE", Hmin: 0.0, Hmax: 0.0, Count: 2500})
+	setting.AddNodeType(deployment.NodeType{Name: "UE", Hmin: 10.0, Hmax: 10.0, Count: 2500})
 	setting.AddNodeType(deployment.NodeType{Name: "WAP", Hmin: 0.0, Hmax: 0.0, Count: WAPNodes})
 	setting.AddNodeType(deployment.NodeType{Name: "PICO", Hmin: 0.0, Hmax: 0.0, Count: NCluster * ClusterSize})
 	setting.AddNodeType(deployment.NodeType{Name: "NOKIA", Hmin: 5, Hmax: 5, Count: 30})
@@ -173,6 +175,15 @@ func main() {
 	model.ModelSetting.SetDefault()
 	model.ModelSetting.Param[0] = 4
 	SingleCellDeploy(&singlecell)
+
+	templateAAS = antenna.NewAAS()
+	templateAAS.SetDefault()
+	templateAAS.N = 8
+	templateAAS.BeamTilt = 0
+	templateAAS.HTiltAngle = -35
+	templateAAS.VTiltAngle = 0
+	templateAAS.DisableBeamTit = false
+
 	ueLinkInfo := CalculatePathLoss(&singlecell, &model)
 	rssi := vlib.NewVectorF(len(ueLinkInfo))
 	for indx, val := range ueLinkInfo {
@@ -197,13 +208,6 @@ func main() {
 
 func CalculatePathLoss(singlecell *deployment.DropSystem, model *pathloss.PathLossModel) []LinkInfo {
 
-	templateAAS := antenna.NewAAS()
-	templateAAS.SetDefault()
-	templateAAS.N = 8
-	templateAAS.BeamTilt = 0
-	templateAAS.HTiltAngle = -35
-	templateAAS.VTiltAngle = 10
-	templateAAS.DisableBeamTit = false
 	txNodeNames := singlecell.GetTxNodeNames()
 	txNodeNames = []string{"BS"}
 
