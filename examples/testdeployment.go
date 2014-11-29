@@ -43,18 +43,21 @@ func main() {
 
 	templateAAS = antenna.NewAAS()
 	templateAAS.SetDefault()
-	templateAAS.N = 1
-	templateAAS.BeamTilt = 14
+	templateAAS.N = 8
+	templateAAS.BeamTilt = 0
 	templateAAS.HTiltAngle = 0
-	templateAAS.VTiltAngle = 10
+	templateAAS.VTiltAngle = 0
 	templateAAS.DisableBeamTit = false
 	templateAAS.Omni = false
 	ueLinkInfo := CalculatePathLoss(&singlecell, &model)
 	rssi := vlib.NewVectorF(len(ueLinkInfo))
 	for indx, val := range ueLinkInfo {
-		vec := statistics.Float64(val.MinPathLos)
+
+		temp := vlib.InvDbF(val.MinPathLos)
+		vec := statistics.Float64(temp)
 		gain, _ := statistics.Max(&vec)
-		rssi[indx] = gain
+		SIR := gain / (vlib.Sum(temp) - gain)
+		rssi[indx] = vlib.Db(SIR)
 	}
 	matlab.Export("rssi", rssi)
 	matlab.ExportStruct("LinkInfo", ueLinkInfo)
@@ -112,6 +115,7 @@ func CalculatePathLoss(singlecell *deployment.DropSystem, model *pathloss.PathLo
 						templateAAS.HTiltAngle = angles[k]
 						templateAAS.Omni = false
 					} else {
+						templateAAS.HTiltAngle = 0
 						templateAAS.Omni = true
 					}
 
@@ -133,6 +137,7 @@ func CalculatePathLoss(singlecell *deployment.DropSystem, model *pathloss.PathLo
 					// matlab.Export(matstr, data)
 				}
 				data := statistics.Float64(allpathlossPerTxType)
+
 				info.MinPathLos[indx], info.MinPathLosNode[indx] = statistics.Max(&data)
 
 			}
