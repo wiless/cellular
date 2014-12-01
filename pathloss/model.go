@@ -7,9 +7,9 @@ import (
 
 	// "flag"
 
+	"github.com/wiless/vlib"
 	"math"
 	"math/cmplx"
-	"wiless/vlib"
 )
 
 type PathLossType int

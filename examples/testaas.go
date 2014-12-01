@@ -3,7 +3,7 @@ package main
 import (
 	// "encoding/json"
 	// "fmt"
-	"wiless/cellular/antenna"
+	"github.com/wiless/cellular/antenna"
 )
 
 func main() {

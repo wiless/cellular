@@ -8,9 +8,9 @@ import (
 
 	// "flag"
 	"fmt"
+	"github.com/wiless/vlib"
 	"math"
 	"math/cmplx"
-	"wiless/vlib"
 )
 
 var Nodes = 360

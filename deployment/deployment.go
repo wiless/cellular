@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	sim "github.com/wiless/cellular"
+	"github.com/wiless/vlib"
 	"log"
 	"math"
 	"math/rand"
-	sim "wiless/cellular"
-	"wiless/vlib"
 )
 
 // func (c *Complex) MarshalJSON() ([]byte, error) {

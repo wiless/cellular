@@ -3,13 +3,13 @@ package main
 import (
 	"fmt"
 	"github.com/grd/statistics"
+	"github.com/wiless/cellular/antenna"
+	"github.com/wiless/cellular/deployment"
+	"github.com/wiless/cellular/pathloss"
+	"github.com/wiless/vlib"
 	"log"
 	"math/rand"
 	"time"
-	"wiless/cellular/antenna"
-	"wiless/cellular/deployment"
-	"wiless/cellular/pathloss"
-	"wiless/vlib"
 )
 
 var matlab *vlib.Matlab
@@ -116,6 +116,7 @@ func CalculatePathLoss(singlecell *deployment.DropSystem, model *pathloss.PathLo
 						templateAAS.Omni = false
 					} else {
 						templateAAS.HTiltAngle = 0
+
 						templateAAS.Omni = true
 					}
 
