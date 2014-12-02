@@ -10,18 +10,6 @@ import (
 
 var matlab *vlib.Matlab
 
-// func startServer(obj *deployment.DropSystem) {
-// 	rpc.Register(obj)
-// 	rpcserver := rpc.NewServer()
-// 	rpcserver.RegisterName("Box", obj)
-// 	rpc.HandleHTTP()
-// 	l, e := net.Listen("tcp", ":1234")
-// 	if e != nil {
-// 		log.Fatal("listen error:", e)
-// 	}
-// 	go http.Serve(l, nil)
-// }
-
 func main() {
 
 	rand.Seed(time.Now().Unix())

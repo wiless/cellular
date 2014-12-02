@@ -17,10 +17,11 @@ var matlab *vlib.Matlab
 var templateAAS *antenna.SettingAAS
 
 type LinkInfo struct {
-	RxID           int
-	NodeTypes      []string
-	MinPathLos     vlib.VectorF
-	MinPathLosNode vlib.VectorI
+	RxID              int
+	NodeTypes         []string
+	LinkGain          vlib.VectorF
+	LinkGainNode      vlib.VectorI
+	InterferenceLinks vlib.VectorF
 }
 
 var angles vlib.VectorF = vlib.VectorF{-45, -135, 135, 45}
@@ -53,13 +54,15 @@ func main() {
 	rssi := vlib.NewVectorF(len(ueLinkInfo))
 	for indx, val := range ueLinkInfo {
 
-		temp := vlib.InvDbF(val.MinPathLos)
-		vec := statistics.Float64(temp)
-		gain, _ := statistics.Max(&vec)
-		SIR := gain / (vlib.Sum(temp) - gain)
+		temp := vlib.InvDbF(val.LinkGain)
+		MaxSignal := vlib.Max(temp)
+
+		TotalInterference := (vlib.Sum(temp) - MaxSignal) + vlib.Sum(vlib.InvDbF(val.InterferenceLinks))
+		SIR := MaxSignal / TotalInterference
 		rssi[indx] = vlib.Db(SIR)
 	}
-	matlab.Export("rssi", rssi)
+	// matlab.Export("rssi", rssi)
+	matlab.Export("SIR", rssi)
 	matlab.ExportStruct("LinkInfo", ueLinkInfo)
 
 	// matlab.ExportStruct("nodeTypes", singlecell.GetTxNodeNames())
@@ -98,8 +101,9 @@ func CalculatePathLoss(singlecell *deployment.DropSystem, model *pathloss.PathLo
 
 		func(rxlocation vlib.Location3D, txNodeNames []string) {
 			info.NodeTypes = make([]string, len(txNodeNames))
-			info.MinPathLos = vlib.NewVectorF(len(txNodeNames))
-			info.MinPathLosNode = vlib.NewVectorI(len(txNodeNames))
+			info.LinkGain = vlib.NewVectorF(len(txNodeNames))
+			info.LinkGainNode = vlib.NewVectorI(len(txNodeNames))
+			info.InterferenceLinks = vlib.NewVectorF(len(txNodeNames))
 			for indx, name := range txNodeNames {
 				txlocs := singlecell.Locations(name)
 				txLocs3D := singlecell.Locations3D(name)
@@ -108,6 +112,7 @@ func CalculatePathLoss(singlecell *deployment.DropSystem, model *pathloss.PathLo
 
 				info.NodeTypes[indx] = name
 				N := txlocs.Size()
+
 				for k := 0; k < N; k++ {
 
 					// angle := float64((k) * 360 / N)
@@ -120,26 +125,19 @@ func CalculatePathLoss(singlecell *deployment.DropSystem, model *pathloss.PathLo
 						templateAAS.Omni = true
 					}
 
-					// log.Println("Angle ", k, " = ", templateAAS.HTiltAngle, "Wrapted ", float64(k*360.0/N))
 					templateAAS.CreateElements(txLocs3D[k])
-					// srcLocation := txlocs[k]
 					distance, _, _ := vlib.RelativeGeo(txLocs3D[k], rxlocation)
-					// distance := cmplx.Abs(rxlocation - srcLocation)
 					lossDb := model.LossInDb(distance)
-					aasgain, _, _ := templateAAS.AASGain(rxlocation)
-
-					// f("%d  %v  %v distance = %v", i, src, rxlocs[k], rxlocs[k]-src)
-					// matstr := fmt.Sprintf("Distance(%d,%d)", rxnodeId+1, k+1)
-					totalGain := vlib.Db(aasgain) - lossDb
-					// fmt.Printf("\n(%s,%d)PL, Gain = %f %f %f", name, k, lossDb, aasgain, totalGain)
-					allpathlossPerTxType[k] = totalGain
+					aasgain, _, _ := templateAAS.AASGain(rxlocation) /// linear scale
+					totalGainDb := vlib.Db(aasgain) - lossDb
+					allpathlossPerTxType[k] = totalGainDb
 
 					// fmt.Printf("\n Distance %f : loss %f dB", distance, lossDb)
 					// matlab.Export(matstr, data)
 				}
 				data := statistics.Float64(allpathlossPerTxType)
-
-				info.MinPathLos[indx], info.MinPathLosNode[indx] = statistics.Max(&data)
+				info.LinkGain[indx], info.LinkGainNode[indx] = statistics.Max(&data) // dB
+				info.InterferenceLinks[indx] = vlib.Db(vlib.Sum(vlib.InvDbF(allpathlossPerTxType)) - vlib.InvDb(info.LinkGain[indx]))
 
 			}
 
@@ -260,8 +258,8 @@ end`
 	scattercmd := `figure;C=colormap;
 	deltaRssi=80/64;
 	deltasize=80/14;
-	S=floor((rssi+110)/deltasize);
-cindx=floor(rssi/deltaRssi);
+	S=floor((SIR+110)/deltasize);
+cindx=floor(SIR/deltaRssi);
 scatter3(real(ue),imag(ue),rssi,64,cindx,'filled');
 colorbar;
 view(2)
@@ -287,7 +285,6 @@ view(2)
 	// 		otherCords = append(otherCords, deployment.HexagonalPoints(centre, CellRadius)...)
 	// 	}
 	// 	// matlab.Export("pos", otherCords)
-
 	// }
 
 }
