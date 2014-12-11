@@ -34,12 +34,14 @@ type ModelSetting struct {
 	CutOffDistance float64
 	Param          []float64 /// Factors relatedto
 	isInitialized  bool
+	AddShadowLoss  bool
 }
 
 func (m *ModelSetting) SetDefault() {
 	m.Type = Exponential
 	m.FreqHz = 2.0e9
 	m.CutOffDistance = 0
+	m.AddShadowLoss = false
 	m.Init()
 
 }

@@ -45,8 +45,11 @@ type SettingAAS struct {
 	VBeamWidth, HBeamWidth           float64
 	SLAV                             float64
 	ESpacingVFactor, ESpacingHFactor float64
-	Centre                           vlib.Location3D `json:-`
+	Centre                           vlib.Location3D `json:"-"`
 	weightVector                     vlib.VectorC
+	AASArrayType                     ArrayType
+	CurveWidthInDegree               float64
+	CurveRadius                      float64
 }
 
 func (s *SettingAAS) SetDefault() {
@@ -63,6 +66,9 @@ func (s *SettingAAS) SetDefault() {
 	s.lamda = cspeed / freq
 	s.ESpacingHFactor = 0 /// Factor mulplied by params.lamda
 	s.ESpacingVFactor = .5
+	s.AASArrayType = LinearPhaseArray
+	s.CurveRadius = 0
+	s.CurveWidthInDegree = 0
 }
 
 func NewAAS() *SettingAAS {
@@ -101,7 +107,8 @@ func RunJSON(jstring string) {
 	// RunAAS(s)
 }
 
-func (params *SettingAAS) CreateElements(centre vlib.Location3D) {
+func (params *SettingAAS) CreateLinearElements(centre vlib.Location3D) {
+
 	if params.N == 0 {
 		return
 	}
@@ -124,11 +131,69 @@ func (params *SettingAAS) CreateElements(centre vlib.Location3D) {
 	params.weightVector = params.FindWeights(params.BeamTilt)
 }
 
+func (params *SettingAAS) CreateCircularElements(centre vlib.Location3D) {
+
+	if params.N == 0 {
+		log.Panicln("AAS Zero elements")
+		return
+	}
+
+	if params.CurveWidthInDegree == 0 || params.CurveRadius == 0 {
+		log.Panicln("AAS Set to Circular Mode with other params=0")
+		return
+	}
+
+	params.Centre = centre
+	params.lamda = cspeed / freq
+
+	// dv := params.ESpacingVFactor * params.lamda
+	// dh := params.ESpacingHFactor * params.lamda
+	params.elementLocations = make([]vlib.Location3D, params.N)
+
+	steps := params.CurveWidthInDegree / float64(params.N)
+	// = dropLinearNodes(params.N, dv, 0)
+	rotateTilt := GetEJtheta(params.VTiltAngle - params.CurveWidthInDegree/2.0 + steps/2) // cmplx.Exp(complex(0, -(params.VTiltAngle)*math.Pi/180.0))
+	degree := 0.0
+	// -params.CurveWidthInDegree / 2.0
+
+	for i := 0; i < params.N; i++ {
+
+		point := GetEJtheta(degree)
+		fmt.Println(i, " = ", point)
+		point *= complex(params.CurveRadius, 0)
+		params.elementLocations[i].X = centre.X + real(point)
+		params.elementLocations[i].Y = centre.Y + imag(point)
+		params.elementLocations[i].Z = centre.Z //+ dv*float64(i) - float64(params.N-1)*dv/2.0
+
+		rotatedpos := params.elementLocations[i].Cmplx() * rotateTilt
+		params.elementLocations[i].FromCmplx(rotatedpos)
+		degree += steps
+	}
+	// fmt.Printf("\n AAS Elem %d locations :  %v", params.N, params.elementLocations)
+	params.weightVector = params.FindWeights(params.BeamTilt)
+}
+
+func (params *SettingAAS) GetElements() []vlib.Location3D {
+	return params.elementLocations
+}
+
+func (params *SettingAAS) CreateElements(centre vlib.Location3D) {
+
+	if params.AASArrayType == LinearPhaseArray {
+		params.CreateLinearElements(centre)
+	}
+
+	if params.AASArrayType == CircularPhaseArray {
+		params.CreateCircularElements(centre)
+	}
+
+}
+
 func (params *SettingAAS) AASGain(dest vlib.Location3D) (gain float64, effectiveThetaH, effectiveThetaV float64) {
 	// src := params.MyLocation()
 
 	params.lamda = cspeed / params.Freq
-	AntennaElementLocations := vlib.ToVectorC(params.elementLocations)
+	AntennaElementLocations := vlib.Location3DtoVecC(params.elementLocations)
 
 	w := vlib.NewOnesC(params.N)
 	w = w.Scale(1.0 / float64(params.N))
@@ -162,7 +227,10 @@ func RunAAS(params SettingAAS) {
 	// TiltAngle = params.VTiltAngle
 
 	params.lamda = cspeed / freq
-	AntennaElementLocations := dropLinearNodes(N, params.lamda/2.0, 0)
+
+	// AntennaElementLocations := dropLinearNodes(N, params.lamda/2.0, 0)
+	params.CreateElements(vlib.Origin3D)
+	AntennaElementLocations := vlib.Location3DtoVecC(params.elementLocations)
 	// WeightVector := vlib.NewVectorF(N)
 	// for i := 0; i < N; i++ {
 	// 	WeightVector[i] = rand.Float64() * 2 * math.Pi
@@ -190,6 +258,7 @@ func RunAAS(params SettingAAS) {
 	/// Evaluate
 
 	Gains := vlib.NewVectorF(NodeLocations.Size())
+
 	for nindx, pos := range NodeLocations {
 
 		var gain complex128 //:= vlib.NewVectorF(AntennaElementLocations.Size())
@@ -200,8 +269,16 @@ func RunAAS(params SettingAAS) {
 			_, phaseDelay[eindx] = math.Modf(dist / params.lamda)
 			phaseDelay[eindx] *= (2.0 * math.Pi) //+ WeightVector[eindx]
 			jtheta := complex(0.0, phaseDelay[eindx])
-			directionGain := math.Sqrt(params.ElementDirectionGain(cmplx.Phase(pos - epos)))
-			gain += complex(directionGain, 0) * cmplx.Exp(-jtheta) * WeightVector[eindx]
+			phyElementDirection := vlib.ToDegree(cmplx.Phase(epos))
+			// phyElementDirection *= -1
+			directionGain := math.Sqrt(params.ElementDirectionGain(phyElementDirection + cmplx.Phase(pos-epos)))
+
+			if cmplx.Phase(pos) == 0 {
+				gain += complex(directionGain, 0) // * cmplx.Exp(-jtheta) * WeightVector[eindx]
+
+			} else {
+				gain += complex(directionGain, 0) * cmplx.Exp(-jtheta) * WeightVector[eindx]
+			}
 		}
 		// fmt.Printf("\n Phase[%d]=%v", nindx, phaseDelay)
 		Gains[nindx] = cmplx.Abs(gain) * cmplx.Abs(gain) / Radius
@@ -226,6 +303,7 @@ func RunAAS(params SettingAAS) {
 	matlab.Export("Locations", NodeLocations)
 	matlab.Export("Gain", Gains)
 	matlab.Export("N", N)
+	matlab.Export("Lamda", params.lamda)
 	matlab.Command("\npattern=(Locations.*sqrt(Gain ));")
 	if !params.HoldOn {
 		matlab.Command("figure;")
@@ -257,7 +335,7 @@ func Radian(degree float64) float64 {
 func (params *SettingAAS) oldFindWeights(theta float64) vlib.VectorC {
 	WeightVectors := vlib.NewVectorC(params.N)
 	// var gain complex128
-	AE := vlib.ToVectorC(params.elementLocations)
+	AE := vlib.Location3DtoVecC(params.elementLocations)
 	meanpos := vlib.MeanC(AE)
 	pos := GetEJtheta(theta) + meanpos
 	// gain := complex(1.0/math.Sqrt(float64(N)), 0)
@@ -390,3 +468,19 @@ func dropLinearNodes(N int, dv, dh float64) vlib.VectorC {
 
 	return result
 }
+
+type ArrayType int
+
+var ArrayTypes = [...]string{
+	"LinearPhaseArray",
+	"CircularPhaseArray",
+}
+
+func (c ArrayType) String() string {
+	return ArrayTypes[c]
+}
+
+const (
+	LinearPhaseArray = iota
+	CircularPhaseArray
+)

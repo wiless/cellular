@@ -24,7 +24,7 @@ type LinkInfo struct {
 	InterferenceLinks vlib.VectorF
 }
 
-var angles vlib.VectorF = vlib.VectorF{-45, -135, 135, 45}
+var angles vlib.VectorF = vlib.VectorF{45, -45, -135, -45}
 
 func main() {
 	matlab = vlib.NewMatlab("deployment")
@@ -44,11 +44,11 @@ func main() {
 
 	templateAAS = antenna.NewAAS()
 	templateAAS.SetDefault()
-	templateAAS.N = 8
+	templateAAS.N = 1
 	templateAAS.BeamTilt = 0
-	templateAAS.HTiltAngle = 0
+	templateAAS.HTiltAngle = 45
 	templateAAS.VTiltAngle = 0
-	templateAAS.DisableBeamTit = false
+	templateAAS.DisableBeamTit = true
 	templateAAS.Omni = false
 	ueLinkInfo := CalculatePathLoss(&singlecell, &model)
 	rssi := vlib.NewVectorF(len(ueLinkInfo))
@@ -82,7 +82,7 @@ func main() {
 func CalculatePathLoss(singlecell *deployment.DropSystem, model *pathloss.PathLossModel) []LinkInfo {
 
 	txNodeNames := singlecell.GetTxNodeNames()
-	// txNodeNames = []string{"BS"} /// do only for BS
+	txNodeNames = []string{"BS"} /// do only for BS
 
 	rxNodeNames := singlecell.GetRxNodeNames()
 	log.Println(txNodeNames, rxNodeNames)
@@ -90,6 +90,17 @@ func CalculatePathLoss(singlecell *deployment.DropSystem, model *pathloss.PathLo
 	// rxlocs := singlecell.Locations("UE")
 	rxlocs3D := singlecell.Locations3D("UE")
 	RxLinkInfo := make([]LinkInfo, len(rxlocs3D))
+
+	/// Generate Shadow Grid
+
+	fmt.Printf("SETTING %s", singlecell.CoverageRegion.Celltype)
+
+	shwGrid := vlib.NewMatrixF(rows, cols)
+	// for i := 0; i < len(rxlocs3D); i++ {
+	// 	rxlocation := rxlocs3D[i]
+	// 	var info LinkInfo
+	// 	info.RxID = i
+	// }
 
 	var pathLossPerRxNode map[int]vlib.VectorF
 	pathLossPerRxNode = make(map[int]vlib.VectorF)
@@ -158,25 +169,26 @@ func SingleCellDeploy(system *deployment.DropSystem) {
 	AreaRadius := CellRadius
 	setting.SetCoverage(deployment.CircularCoverage(AreaRadius))
 
-	WAPNodes := 10
-	NCluster := 5
-	ClusterSize := 10
+	WAPNodes := 1
+	NCluster := 1
+	ClusterSize := 1
 
-	setting.AddNodeType(deployment.NodeType{Name: "BS", Hmin: 25.0, Hmax: 25.0, Count: 4})
-	setting.AddNodeType(deployment.NodeType{Name: "UE", Hmin: 0.0, Hmax: 10.0, Count: 5500})
-	setting.AddNodeType(deployment.NodeType{Name: "WAP", Hmin: 5.0, Hmax: 5.0, Count: WAPNodes})
-	setting.AddNodeType(deployment.NodeType{Name: "PICO", Hmin: 10.0, Hmax: 0.0, Count: NCluster * ClusterSize})
+	setting.AddNodeType(deployment.NodeType{Name: "BS", Hmin: 25.0, Hmax: 25.0, Count: 2})
+	setting.AddNodeType(deployment.NodeType{Name: "UE", Hmin: 0.0, Hmax: 1.5, Count: 5500})
+	setting.AddNodeType(deployment.NodeType{Name: "PICO", Hmin: 0.0, Hmax: 10.0, Count: NCluster * ClusterSize})
 	/// You can save the settings of this deployment by uncommenting this line
 	system.SetSetting(setting)
+
 	system.Init()
 	setting.SetTxNodeNames("BS", "WAP", "PICO")
 	setting.SetRxNodeNames("UE")
 	vlib.SaveStructure(setting, "nodetype.txt", true)
 
+	newsetting := deployment.NewDropSetting()
 	/// Drop UE Nodes
 	{
 
-		locations := deployment.AnnularRingEqPoints(deployment.ORIGIN, 500, system.NodeCount("BS"))
+		locations := deployment.AnnularRingEqPoints(deployment.ORIGIN, 700, system.NodeCount("BS"))
 		system.SetAllNodeLocation("BS", locations)
 		//system.DropNodeType("BS")
 	}
@@ -260,7 +272,7 @@ end`
 	deltasize=80/14;
 	S=floor((SIR+110)/deltasize);
 cindx=floor(SIR/deltaRssi);
-scatter3(real(ue),imag(ue),rssi,64,cindx,'filled');
+scatter3(real(ue),imag(ue),SIR,64,cindx,'filled');
 colorbar;
 view(2)
 `

@@ -1,6 +1,7 @@
 package deployment
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -94,9 +95,89 @@ func (c DropType) String() string {
 
 type DropSystem struct {
 	*dDropSetting
-	Nodes  map[int]*Node
+	Nodes  map[int]Node
 	lastID int
 }
+
+func (d *DropSystem) UnmarshalJSON(jsondata []byte) error {
+	bfr := bytes.NewBuffer(jsondata)
+	dec := json.NewDecoder(bfr)
+	var customobject map[string]interface{}
+	customobject = make(map[string]interface{})
+	dec.Decode(&customobject)
+	d.lastID = int(customobject["LastID"].(float64))
+	temp := customobject["DropSetting"].(dDropSetting)
+
+	fmt.Printf("\n DropSetting : %v", temp)
+	bfr.WriteString(`{`)
+	bfr.WriteString(`"DropSetting":`)
+	// enc.Encode(d.dDropSetting)
+	// // bfr.Bytes()[bfr.Len()-2] = ' '
+	// bfr.WriteString(`,"Nodes":[`)
+	// cnt := 0
+	// maxcount := len(d.Nodes)
+	// for key, val := range d.Nodes {
+	// 	obj := struct {
+	// 		ID      int
+	// 		NodeObj Node
+	// 	}{key, *val}
+	// 	enc.Encode(obj)
+
+	// 	cnt++
+	// 	if cnt == maxcount {
+	// 		break
+	// 	} else {
+	// 		bfr.WriteByte(',')
+	// 	}
+
+	// }
+
+	// bfr.WriteByte(']')
+	// bfr.WriteString(`,"LastID":`)
+	// enc.Encode(d.lastID)
+	// bfr.WriteString("}\n")
+	// return bfr.Bytes(), nil
+	return nil
+}
+
+func (d *DropSystem) MarshalJSON() ([]byte, error) {
+
+	bfr := bytes.NewBuffer(nil)
+	enc := json.NewEncoder(bfr)
+	bfr.WriteString(`{`)
+	bfr.WriteString(`"DropSetting":`)
+	enc.Encode(d.dDropSetting)
+	// bfr.Bytes()[bfr.Len()-2] = ' '
+	bfr.WriteString(`,"Nodes":[`)
+	cnt := 0
+	maxcount := len(d.Nodes)
+	for key, val := range d.Nodes {
+		obj := struct {
+			ID      int
+			NodeObj Node
+		}{key, val}
+		enc.Encode(obj)
+
+		cnt++
+		if cnt == maxcount {
+			break
+		} else {
+			bfr.WriteByte(',')
+		}
+
+	}
+
+	bfr.WriteByte(']')
+	bfr.WriteString(`,"LastID":`)
+	enc.Encode(d.lastID)
+	bfr.WriteString("}\n")
+	return bfr.Bytes(), nil
+}
+
+// func (c *Complex) UnmarshalJSON([]byte) error {
+// 	fmt.Print("Something")
+// 	return nil
+// }
 
 type Area struct {
 	Celltype   DropType
@@ -252,7 +333,7 @@ func (d *dDropSetting) Init() {
 
 func (d *DropSystem) Init() {
 	d.dDropSetting.Init()
-	d.Nodes = make(map[int]*Node)
+	d.Nodes = make(map[int]Node)
 	count := 0
 
 	for indx, _ := range d.NodeTypes {
@@ -262,7 +343,7 @@ func (d *DropSystem) Init() {
 
 		for i := 0; i < d.NodeTypes[indx].Count; i++ {
 			node := d.NewNode(d.NodeTypes[indx].Name)
-			d.Nodes[node.id] = node
+			d.Nodes[node.id] = *node
 			d.NodeTypes[indx].nodeIDs[i] = node.id
 		}
 		count += d.NodeTypes[indx].Count
