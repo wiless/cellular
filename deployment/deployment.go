@@ -412,9 +412,16 @@ func (d *DropSystem) PopulateHeight(ntype string) {
 	// result := vlib.NewVectorC(notype.Count)
 	Hrange := notype.Hmax - notype.Hmin
 	for i := 0; i < notype.nodeIDs.Size(); i++ {
+
 		if random {
 			height = Hrange*rand.Float64() + notype.Hmin
+
 		}
+		fmt.Println("BEFORE ", d.Nodes[notype.nodeIDs[i]])
+		x := d.Nodes[notype.nodeIDs[i]]
+		x.Location.SetHeight(height)
+		fmt.Println("BEFORE ", d.Nodes[notype.nodeIDs[i]])
+
 		d.Nodes[notype.nodeIDs[i]].Location.SetHeight(height)
 	}
 
