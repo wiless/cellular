@@ -106,14 +106,20 @@ func RunJSON(jstring string) {
 	fmt.Printf("Wowf %v is this %v", jstring, s)
 	// RunAAS(s)
 }
+func GetLamda(freq float64) float64 {
+	return cspeed / freq
+}
 
+func (params *SettingAAS) GetLamda() float64 {
+	return params.lamda
+}
 func (params *SettingAAS) CreateLinearElements(centre vlib.Location3D) {
 
 	if params.N == 0 {
 		return
 	}
 	params.Centre = centre
-	params.lamda = cspeed / freq
+	params.lamda = cspeed / params.Freq
 	dv := params.ESpacingVFactor * params.lamda
 	// dh := params.ESpacingHFactor * params.lamda
 	params.elementLocations = make([]vlib.Location3D, params.N)
@@ -159,7 +165,6 @@ func (params *SettingAAS) CreateCircularElements(centre vlib.Location3D) {
 	for i := 0; i < params.N; i++ {
 
 		point := GetEJtheta(degree)
-		fmt.Println(i, " = ", point)
 		point *= complex(params.CurveRadius, 0)
 		params.elementLocations[i].X = centre.X + real(point)
 		params.elementLocations[i].Y = centre.Y + imag(point)
@@ -189,6 +194,21 @@ func (params *SettingAAS) CreateElements(centre vlib.Location3D) {
 
 }
 
+/// Returns the Phase of the Signal at the given location from all its elements after applying weights at its elements
+func (params *SettingAAS) GetRxPhase(dest vlib.Location3D) []complex128 {
+	result := vlib.NewVectorC(params.N)
+	params.lamda = GetLamda(params.Freq)
+	for indx, src := range params.elementLocations {
+		d, theh, thev := vlib.RelativeGeo(src, dest)
+		elemGain := complex((params.ElementEffectiveGain(theh, thev)), 0)
+		_, phaseDelay := math.Modf(2 * math.Pi * (d / params.lamda)) // returns the fractional part
+		phaseDelay = vlib.ToDegree(phaseDelay)
+
+		result[indx] = GetEJtheta(phaseDelay) * elemGain
+	}
+	return result
+}
+
 func (params *SettingAAS) AASGain(dest vlib.Location3D) (gain float64, effectiveThetaH, effectiveThetaV float64) {
 	// src := params.MyLocation()
 
@@ -207,8 +227,8 @@ func (params *SettingAAS) AASGain(dest vlib.Location3D) (gain float64, effective
 		dist, thetaH, thetaV := vlib.RelativeGeo(params.elementLocations[i], dest)
 		// dist= cmplx.Abs(params.elementLocations[i].Cmplx()-dest.Cmplx())
 		aGain := complex((params.ElementEffectiveGain(thetaH, thetaV)), 0)
-		_, phaseDelay[i] = math.Modf(vlib.ToDegree(dist / params.lamda))
-		Rxcomponent += GetEJtheta(phaseDelay[i]) * w[i] * aGain
+		_, phaseDelay[i] = (math.Modf(2 * math.Pi * dist / params.lamda))
+		Rxcomponent += GetEJtheta(vlib.ToDegree(phaseDelay[i])) * w[i] * aGain
 	}
 	gain = math.Pow(cmplx.Abs(Rxcomponent), 2)
 	_, effectiveThetaH, effectiveThetaV = vlib.RelativeGeo(params.Centre, dest)

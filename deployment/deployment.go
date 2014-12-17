@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
+
+	ms "github.com/mitchellh/mapstructure"
 	sim "github.com/wiless/cellular"
 	"github.com/wiless/vlib"
 	"log"
@@ -31,12 +34,16 @@ import (
 // }
 
 type Node struct {
-	Type     string
-	id       int
-	Location vlib.Location3D
-	Height   float64
-	Meta     string
-	Indoor   bool
+	Type        string
+	ID          int
+	Location    vlib.Location3D
+	Height      float64
+	Meta        string
+	Indoor      bool
+	Orientation vlib.VectorF
+	AntennaType int
+	Frequency   vlib.VectorF `json:"FreqGHz"`
+	Mode        TxRxMode     `json:"TxRxMode"`
 }
 
 type DropParameter struct {
@@ -55,6 +62,10 @@ type DropParameter struct {
 	// Number of Drops
 	NCount int
 }
+
+// func (n Node) MarshalJSON() ([]byte, error) {
+// 	return json.Marshal(n.Meta)
+// }
 
 func (d DropParameter) MarshalJSON() ([]byte, error) {
 	// var mydata map[string]interface{}
@@ -76,11 +87,27 @@ type NodeType struct {
 	Hmax    float64
 	Count   int
 	startID int
-	nodeIDs vlib.VectorI
+	NodeIDs vlib.VectorI `json:",strings"`
 	Params  DropParameter
 }
 
 type DropType int
+type TxRxMode int
+
+var TxRxModes = [...]string{
+	"TransmitOnly",
+	"ReceiveOnly",
+	"Duplex",
+	"Inactive",
+}
+
+func (c TxRxMode) String() string {
+	if int(c) >= len(TxRxModes) {
+		return "Unknown!!"
+	}
+
+	return TxRxModes[c]
+}
 
 var DropTypes = [...]string{
 	"Circular",
@@ -102,41 +129,30 @@ type DropSystem struct {
 func (d *DropSystem) UnmarshalJSON(jsondata []byte) error {
 	bfr := bytes.NewBuffer(jsondata)
 	dec := json.NewDecoder(bfr)
+
 	var customobject map[string]interface{}
 	customobject = make(map[string]interface{})
+
 	dec.Decode(&customobject)
 	d.lastID = int(customobject["LastID"].(float64))
-	temp := customobject["DropSetting"].(dDropSetting)
 
-	fmt.Printf("\n DropSetting : %v", temp)
-	bfr.WriteString(`{`)
-	bfr.WriteString(`"DropSetting":`)
-	// enc.Encode(d.dDropSetting)
-	// // bfr.Bytes()[bfr.Len()-2] = ' '
-	// bfr.WriteString(`,"Nodes":[`)
-	// cnt := 0
-	// maxcount := len(d.Nodes)
-	// for key, val := range d.Nodes {
-	// 	obj := struct {
-	// 		ID      int
-	// 		NodeObj Node
-	// 	}{key, *val}
-	// 	enc.Encode(obj)
+	d.dDropSetting = NewDropSetting()
+	ms.Decode(customobject["DropSetting"], d.dDropSetting)
 
-	// 	cnt++
-	// 	if cnt == maxcount {
-	// 		break
-	// 	} else {
-	// 		bfr.WriteByte(',')
-	// 	}
+	type obj struct {
+		ID      int
+		NodeObj Node
+	}
+	var nodes []obj
+	m := customobject["Nodes"]
+	ms.Decode(m, &nodes)
+	d.Nodes = make(map[int]Node)
+	for _, val := range nodes {
+		// val.NodeObj.id = val.ID
+		d.Nodes[val.ID] = val.NodeObj
 
-	// }
+	}
 
-	// bfr.WriteByte(']')
-	// bfr.WriteString(`,"LastID":`)
-	// enc.Encode(d.lastID)
-	// bfr.WriteString("}\n")
-	// return bfr.Bytes(), nil
 	return nil
 }
 
@@ -147,17 +163,20 @@ func (d *DropSystem) MarshalJSON() ([]byte, error) {
 	bfr.WriteString(`{`)
 	bfr.WriteString(`"DropSetting":`)
 	enc.Encode(d.dDropSetting)
-	// bfr.Bytes()[bfr.Len()-2] = ' '
+	// fmt.Printf("\nSettings %s", bfr.Bytes())
 	bfr.WriteString(`,"Nodes":[`)
-	cnt := 0
+
 	maxcount := len(d.Nodes)
+	cnt := 0
 	for key, val := range d.Nodes {
 		obj := struct {
 			ID      int
 			NodeObj Node
 		}{key, val}
 		enc.Encode(obj)
-
+		// if cnt == 0 {
+		// 	fmt.Printf("\nEncoded Object %s", bfr.Bytes())
+		// }
 		cnt++
 		if cnt == maxcount {
 			break
@@ -166,11 +185,11 @@ func (d *DropSystem) MarshalJSON() ([]byte, error) {
 		}
 
 	}
-
 	bfr.WriteByte(']')
 	bfr.WriteString(`,"LastID":`)
 	enc.Encode(d.lastID)
-	bfr.WriteString("}\n")
+	bfr.WriteString("}")
+
 	return bfr.Bytes(), nil
 }
 
@@ -236,13 +255,17 @@ func (d *DropSystem) NewNode(ntype string) *Node {
 	node := new(Node)
 	node.Type = notype.Name
 	node.Indoor = false
+	node.Frequency = []float64{FcInGHz}
+	node.AntennaType = 0
+	node.Orientation = []float64{0, 0} /// Horizontal, Vertical orientation in degree
+	node.Mode = Inactive
 	if notype.Hmin == notype.Hmax {
 		node.Height = notype.Hmin
 	} else {
 		node.Height = rand.Float64()*(notype.Hmax-notype.Hmin) + notype.Hmin
 	}
-	// node.id = notype.startID
-	node.id = d.lastID
+	// node.ID = notype.startID
+	node.ID = d.lastID
 	// fmt.Printf("\n Node Type is %#v", notype)
 	// fmt.Printf("\n Creating a Node of type %s , with ID %d for Coverage Type %s", ntype, node.id, d.CoverageRegion.CellType)
 
@@ -326,7 +349,7 @@ func (d *dDropSetting) Init() {
 	d.isInitialized = true
 
 	for indx, _ := range d.NodeTypes {
-		d.NodeTypes[indx].nodeIDs = vlib.NewVectorI(d.NodeTypes[indx].Count)
+		d.NodeTypes[indx].NodeIDs = vlib.NewVectorI(d.NodeTypes[indx].Count)
 		//	fmt.Println("The node types are  : indx, nodetype ", indx, notype)
 	}
 }
@@ -338,20 +361,49 @@ func (d *DropSystem) Init() {
 
 	for indx, _ := range d.NodeTypes {
 		d.NodeTypes[indx].startID = count
-		d.NodeTypes[indx].nodeIDs.Resize(d.NodeTypes[indx].Count)
-		//fmt.Println("\nWill Create %s Nodes %d : %v", d.NodeTypes[indx].Name, d.NodeTypes[indx].Count, d.NodeTypes[indx].nodeIDs)
+		d.NodeTypes[indx].NodeIDs.Resize(d.NodeTypes[indx].Count)
 
 		for i := 0; i < d.NodeTypes[indx].Count; i++ {
 			node := d.NewNode(d.NodeTypes[indx].Name)
-			d.Nodes[node.id] = *node
-			d.NodeTypes[indx].nodeIDs[i] = node.id
+			d.Nodes[node.ID] = *node
+			d.NodeTypes[indx].NodeIDs[i] = node.ID
 		}
 		count += d.NodeTypes[indx].Count
 
-		//fmt.Printf("\n Nodes %s created %d ", d.NodeTypes[indx].Name, d.NodeTypes[indx].nodeIDs.Size())
 	}
-	//fmt.Println("SYSTEM IS = ", d)
 
+	/// Set all nodes of type TxNodes to transmit only
+	//
+	//
+	log.Println("tx Nodes ", d.TxNodeNames)
+	log.Println("rx Nodes ", d.RxNodeNames)
+
+	for _, ntype := range d.NodeTypes {
+
+		var currentMode TxRxMode = Inactive
+		var support int = -1
+
+		if found, _ := vlib.Contains(d.TxNodeNames, ntype.Name); found {
+			currentMode = TransmitOnly
+			support = +1
+		}
+		if found, _ := vlib.Contains(d.RxNodeNames, ntype.Name); found {
+			currentMode = ReceiveOnly
+			support = +1
+		}
+		if support == 2 {
+			currentMode = Duplex
+		}
+		for _, val := range ntype.NodeIDs {
+			//
+
+			node := d.Nodes[val]
+			// log.Printf("\n Setting  %s [%d] to Type %s", node.Type, node.ID, currentMode)
+			node.Mode = currentMode
+			d.Nodes[val] = node
+		}
+
+	}
 }
 
 func (d *DropSystem) GetNodeType(ntype string) *NodeType {
@@ -411,18 +463,15 @@ func (d *DropSystem) PopulateHeight(ntype string) {
 
 	// result := vlib.NewVectorC(notype.Count)
 	Hrange := notype.Hmax - notype.Hmin
-	for i := 0; i < notype.nodeIDs.Size(); i++ {
+	for i := 0; i < notype.NodeIDs.Size(); i++ {
 
 		if random {
 			height = Hrange*rand.Float64() + notype.Hmin
 
 		}
-		fmt.Println("BEFORE ", d.Nodes[notype.nodeIDs[i]])
-		x := d.Nodes[notype.nodeIDs[i]]
-		x.Location.SetHeight(height)
-		fmt.Println("BEFORE ", d.Nodes[notype.nodeIDs[i]])
-
-		d.Nodes[notype.nodeIDs[i]].Location.SetHeight(height)
+		node := d.Nodes[notype.NodeIDs[i]]
+		node.Location.SetHeight(height)
+		d.Nodes[notype.NodeIDs[i]] = node
 	}
 
 }
@@ -433,8 +482,9 @@ func (d *DropSystem) Locations(ntype string) vlib.VectorC {
 
 	result := vlib.NewVectorC(notype.Count)
 	for i := 0; i < (notype.Count); i++ {
+		node := d.Nodes[notype.NodeIDs[i]]
+		result[i] = node.Location.Cmplx()
 
-		result[i] = d.Nodes[notype.nodeIDs[i]].Location.Cmplx()
 	}
 	return result
 }
@@ -443,15 +493,18 @@ func (d *DropSystem) Locations3D(ntype string) []vlib.Location3D {
 	notype := d.GetNodeType(ntype)
 	result := make([]vlib.Location3D, notype.Count)
 	for i := 0; i < (notype.Count); i++ {
-		result[i] = d.Nodes[notype.nodeIDs[i]].Location
+		result[i] = d.Nodes[notype.NodeIDs[i]].Location
 	}
 	return result
 }
 
 func (d *DropSystem) SetNodeLocation(ntype string, nid int, location complex128) {
 	notype := d.GetNodeType(ntype)
-	val := notype.nodeIDs[nid]
-	d.Nodes[val].Location.FromCmplx(location)
+	val := notype.NodeIDs[nid]
+	node := d.Nodes[val]
+	node.Location.FromCmplx(location)
+	d.Nodes[val] = node
+
 	// d.Nodes[val].Location.SetHeight(d.Nodes[val].Height)
 
 }
@@ -466,8 +519,34 @@ func (d *DropSystem) SetAllNodeLocation(ntype string, locations vlib.VectorC) {
 	// fmt.Println("No. of Total Nodes is ", len(d.Nodes))
 	// fmt.Println("No. of Locations is ", locations.Size())
 	// fmt.Println("No. of NodeIDs is ", notype)
-	for indx, val := range notype.nodeIDs {
-		d.Nodes[val].Location.FromCmplx(locations[indx])
+	for indx, val := range notype.NodeIDs {
+		node := d.Nodes[val]
+		node.Location.FromCmplx(locations[indx])
+		d.Nodes[val] = node
+
+	}
+}
+
+func (d *DropSystem) SetAllNodeProperty(ntype, property string, data interface{}) {
+	notype := d.GetNodeType(ntype)
+
+	for _, val := range notype.NodeIDs {
+		node := d.Nodes[val]
+		tofnode := reflect.TypeOf(node)
+		field, found := tofnode.FieldByName(property)
+
+		if found {
+			// log.Printf("\n B4 Node  %v", node)
+			el := reflect.ValueOf(&node).Elem()
+			if reflect.TypeOf(data).String() != field.Type.String() {
+				log.Panicf("SetAllNodeProperty(): Type Mismatch %v != %v,", reflect.TypeOf(data), field.Type)
+			}
+			el.FieldByName(property).Set(reflect.ValueOf(data))
+			// log.Printf("\n A4 Node  %v", node)
+			// stvalue.FieldByName(property).Set(reflect.ValueOf(data))
+			d.Nodes[val] = node
+		}
+		// node.Location.FromCmplx()
 	}
 }
 
@@ -613,7 +692,7 @@ func RectangularCoverage(length float64) Area {
 func (d *DropSystem) GetNodeIDs(ntype string) vlib.VectorI {
 	indx := d.GetNodeIndex(ntype)
 	if indx != -1 {
-		return d.NodeTypes[indx].nodeIDs
+		return d.NodeTypes[indx].NodeIDs
 	}
 	return vlib.NewVectorI(0)
 }
@@ -646,11 +725,19 @@ func (d *DropSystem) Drop(dp *DropParameter, result *vlib.VectorC) error {
 }
 
 const (
-	ORIGIN = complex(0, 0)
+	ORIGIN  = complex(0, 0)
+	FcInGHz = 2.1 /// Default carrier frequency
 )
 const (
 	Circular DropType = iota
 	Hexagonal
 	Rectangular
 	Annular
+)
+
+const (
+	TransmitOnly TxRxMode = iota
+	ReceiveOnly
+	Duplex
+	Inactive
 )

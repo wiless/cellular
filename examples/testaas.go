@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/wiless/vlib"
 
 	// "encoding/json"
 	// "fmt"
@@ -9,28 +10,37 @@ import (
 )
 
 func main() {
-	var setting antenna.SettingAAS
 
-	setting.SetDefault()
-	setting.N = 3
-	setting.Freq = 2e9
-	setting.BeamTilt = 0
-	setting.DisableBeamTit = true
-	setting.VTiltAngle = 0
-	setting.HTiltAngle = 0
-	setting.Omni = false
-	setting.MfileName = "outputCircular.m"
-	setting.HoldOn = false
-	setting.AASArrayType = antenna.CircularPhaseArray
-	setting.CurveWidthInDegree = 30.0
-	setting.CurveRadius = 1.00
+	var vcell1 antenna.SettingAAS
 
-	fmt.Print(setting)
+	vcell1.SetDefault()
+	vcell1.N = 4
+	vcell1.Freq = 1e9
+	vcell1.BeamTilt = 0
+	vcell1.DisableBeamTit = true
+	vcell1.VTiltAngle = 0
+	vcell1.ESpacingVFactor = .5
+	vcell1.HTiltAngle = 0
+	vcell1.Omni = false
+	vcell1.MfileName = "output.m"
+	vcell1.HoldOn = false
+	vcell1.AASArrayType = antenna.LinearPhaseArray
+	vcell1.CurveWidthInDegree = 30.0
+	vcell1.CurveRadius = 1.00
 
-	// setting.CreateElements(vlib.Origin3D)
-	// fmt.Println(setting.GetElements())
-	// fmt.Printf("v=%f", vlib.Location3DtoVecC(setting.GetElements()))
+	fmt.Print(vcell1)
+	var AntennaLocation vlib.Location3D
+	AntennaLocation.SetLoc(complex(0, 0), 25.0)
+	vcell1.CreateElements(AntennaLocation)
 
-	antenna.RunAAS(setting)
+	fmt.Printf("\nLocations %#v", vcell1.GetElements())
+
+	fmt.Printf("\nLamda %#v", vcell1.GetLamda())
+
+	///fmt.Printf("\nAntenna=%f", vlib.Location3DtoVecC(vcell1.GetElements()))
+
+	// vcell1.ElementEffectiveGain(thetaH, thetaV)
+
+	// antenna.RunAAS(setting)
 
 }
