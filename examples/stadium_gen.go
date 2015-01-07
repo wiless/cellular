@@ -55,7 +55,6 @@ func main() {
 	SingleCellDeploy(&singlecell)
 
 	/// Save deployment
-	vlib.SaveStructure(&singlecell, "stadiumOut.json", true)
 
 	// fb, err := singlecell.MarshalJSON()
 	// fmt.Println(err, "\n", string(fb))
@@ -79,7 +78,7 @@ func main() {
 	/// Generate Antennas for every Transmit Node
 	/// If
 
-	// templateAAS = antenna.NewAAS()
+	// templateAAS := antenna.NewAAS()
 	// templateAAS.SetDefault()
 	// templateAAS.N = 1
 	// templateAAS.BeamTilt = 0
@@ -107,6 +106,12 @@ func main() {
 		rssi[indx] = vlib.Db(SIR)
 	}
 	// matlab.Export("rssi", rssi)
+
+	singlecell.SetAllNodeProperty("UE", "AntennaType", 0)
+	singlecell.SetAllNodeProperty("PICO", "AntennaType", 1)                /// Set All Pico to use antenna Type 0
+	singlecell.SetAllNodeProperty("UE", "FreqGHz", vlib.VectorF{2.1, 3.5}) /// Set All Pico to use antenna Type 0
+
+	vlib.SaveStructure(&singlecell, "stadiumOut.json", true)
 	matlab.Export("SIR", rssi)
 	matlab.ExportStruct("LinkInfo", ueLinkInfo)
 

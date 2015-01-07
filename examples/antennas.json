@@ -1,0 +1,48 @@
+[
+	{
+		"ObjectID": 0,
+		"Object": {
+			"Freq": 2e+09,
+			"N": 1,
+			"Nodes": 360,
+			"Omni": false,
+			"MfileName": "output.m",
+			"VTiltAngle": 0,
+			"HTiltAngle": 0,
+			"BeamTilt": 0,
+			"DisableBeamTit": true,
+			"HoldOn": false,
+			"VBeamWidth": 65,
+			"HBeamWidth": 65,
+			"SLAV": 30,
+			"ESpacingVFactor": 0.5,
+			"ESpacingHFactor": 0,
+			"AASArrayType": 0,
+			"CurveWidthInDegree": 0,
+			"CurveRadius": 0
+		}
+	},
+	{
+		"ObjectID": 1,
+		"Object": {
+			"Freq": 2e+09,
+			"N": 1,
+			"Nodes": 360,
+			"Omni": true,
+			"MfileName": "output.m",
+			"VTiltAngle": 0,
+			"HTiltAngle": 0,
+			"BeamTilt": 0,
+			"DisableBeamTit": true,
+			"HoldOn": false,
+			"VBeamWidth": 65,
+			"HBeamWidth": 65,
+			"SLAV": 30,
+			"ESpacingVFactor": 0.5,
+			"ESpacingHFactor": 0,
+			"AASArrayType": 0,
+			"CurveWidthInDegree": 0,
+			"CurveRadius": 0
+		}
+	}
+]
