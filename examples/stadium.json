@@ -33,7 +33,7 @@
 				"Name": "PICO",
 				"Hmin": 20,
 				"Hmax": 25,
-				"Count": 2,
+				"Count": 3,
 				"NodeIDs": [
 					10,
 					11
@@ -113,6 +113,30 @@
 			}
 		},
 		{
+			"ID": 11,
+			"NodeObj": {
+				"Type": "PICO",
+				"ID": 12,
+				"Location": {
+					"X": 196.29212525834589,
+					"Y": -60.04172643544525,
+					"Z": 0
+				},
+				"Height": 20.755493298666586,
+				"Meta": "",
+				"Indoor": false,
+				"Orientation": [
+					0,
+					0
+				],
+				"AntennaType": 1,
+				"FreqGHz": [
+					2.1, 3.5
+				],
+				"TxRxMode": 0
+			}
+		},
+		{
 			"ID": 1,
 			"NodeObj": {
 				"Type": "UE",
@@ -131,7 +155,7 @@
 				],
 				"AntennaType": 0,
 				"FreqGHz": [
-					2.1
+					2.1, 3.5
 				],
 				"TxRxMode": 1
 			}

@@ -33,14 +33,15 @@ type LinkInfo struct {
 type LinkMetric struct {
 	RxNodeID     int
 	FreqInGHz    float64
+	BandwidthMHz float64
+	N0           float64
 	TxNodeIDs    vlib.VectorI
 	TxNodesRSRP  vlib.VectorF
-	BestRSSI     float64
-	BestRSSINode int
+	RSSI         float64
 	BestRSRP     float64
 	BestRSRPNode int
 	BestSINR     float64
-	BestSINRNode int
+	RoIDbm       float64
 }
 
 var angles vlib.VectorF = vlib.VectorF{45, -45, -135, -45}
@@ -102,14 +103,11 @@ func main() {
 		metrics := EvaluteMetric(&singlecell, &model, rxid)
 		if len(metrics) > 1 {
 			log.Printf("%s[%d] Supports %d Carriers", "UE", rxid, len(metrics))
+			// log.Printf("%s[%d] Links %#v ", "UE", rxid, metrics)
 		}
 		MetricPerRx[rxid] = metrics
 	}
 	vlib.SaveMapStructure2(MetricPerRx, "linkmetric.json", "UE", "LinkMetric", true)
-
-	// EvaluteMetric(&singlecell, &model, rxids[0])
-	// EvaluteMetric(&singlecell, &model, rxids[1])
-	// EvaluteMetric(&singlecell, &model, rxids[2])
 
 	// CreateChannelLinks()
 
@@ -136,12 +134,15 @@ func main() {
 /// Calculate Pathloss
 
 func EvaluteMetric(singlecell *deployment.DropSystem, model *pathloss.PathLossModel, rxid int) []LinkMetric {
-
+	BandwidthMHz := 20.0
+	NoisePSDdBm := -173.9
+	N0 := NoisePSDdBm + vlib.Db(BandwidthMHz*1e6)
 	var PerFreqLink map[float64]LinkMetric
 	PerFreqLink = make(map[float64]LinkMetric)
 	rxnode := singlecell.Nodes[rxid]
 	// nfrequencies := len(rxnode.Frequency)
-	log.Printf("Rx Supports %3.2fGHz", rxnode.FreqGHz)
+	// log.SetOutput(os.Stderr)
+	log.Printf("%s[%d] Supports %3.2f GHz", rxnode.Type, rxnode.ID, rxnode.FreqGHz)
 	txnodeTypes := singlecell.GetTxNodeNames()
 
 	var alltxNodeIds vlib.VectorI
@@ -154,8 +155,9 @@ func EvaluteMetric(singlecell *deployment.DropSystem, model *pathloss.PathLossMo
 
 		link.FreqInGHz = f
 		link.RxNodeID = rxid
-		link.BestRSSINode = -1
 		link.BestRSRP = -1000
+		link.N0 = N0
+		link.BandwidthMHz = BandwidthMHz
 		model.FreqHz = f * 1e9
 		nlinks := 0
 		for _, val := range alltxNodeIds {
@@ -178,29 +180,39 @@ func EvaluteMetric(singlecell *deployment.DropSystem, model *pathloss.PathLossMo
 				totalGainDb := vlib.Db(aasgain) - lossDb
 				link.TxNodesRSRP.AppendAtEnd(totalGainDb)
 
-				log.Printf("Rx %d :  Tx Node  %d : Link @ %3.2fGHz  : %-4.3fdB", rxid, val, f, totalGainDb)
-
-				log.Println(link.TxNodesRSRP)
+				log.Printf("%s[%d] : TxNode %d : Link @ %3.2fGHz  : %-4.3fdB", rxnode.Type, rxid, val, f, totalGainDb)
 
 			} else {
-				log.Printf("Rx %d :  Tx Node  %d : No Link on %3.2fGHz", rxid, val, f)
+				log.Printf("%s[%d] : TxNode %d : No Link on %3.2fGHz", rxnode.Type, rxid, val, f)
 
 			}
 		}
 
-		log.Println("Do stats")
 		/// Do the statistics here
 		if nlinks > 0 {
+			link.N0 = N0
+			link.BandwidthMHz = BandwidthMHz
 
 			rsrpLinr := vlib.InvDbF(link.TxNodesRSRP)
-			totalrssi := vlib.Sum(rsrpLinr)
+			totalrssi := vlib.Sum(rsrpLinr) + vlib.InvDb(link.N0)
 			maxrsrp := vlib.Max(rsrpLinr)
+
+			// if nlinks == 1 {
+			// 	link.BestSINR = vlib.Db(maxrsrp) - N0
+			// 	// +1000 /// s/i = MAX value
+			// } else {
 			link.BestSINR = vlib.Db(maxrsrp / (totalrssi - maxrsrp))
+			// }
+			val, sindx := vlib.Sorted(link.TxNodesRSRP)
 
-			link.BestRSSI = vlib.Db(totalrssi)
+			// fmt.Println("Sorted TxNodes & Values : ", link.TxNodeIDs, link.TxNodesRSRP)
+			link.TxNodesRSRP = val
+			link.TxNodeIDs = link.TxNodeIDs.At(sindx)
+			// fmt.Println("Sorted TxNodes & Values : ", link.TxNodeIDs, link.TxNodesRSRP)
+
+			link.RSSI = vlib.Db(totalrssi)
 			link.BestRSRP = vlib.Db(maxrsrp)
-			log.Println(link.TxNodesRSRP)
-
+			link.BestRSRPNode = link.TxNodeIDs[0]
 			PerFreqLink[f] = link
 		}
 
