@@ -1,0 +1,577 @@
+{
+	"DropSetting": {
+		"NodeTypes": [
+			{
+				"Name": "UE",
+				"Hmin": 1,
+				"Hmax": 10,
+				"Count": 10,
+				"NodeIDs": [
+					0,
+					1,
+					2,
+					3,
+					4,
+					5,
+					6,
+					7,
+					8,
+					9
+				],
+				"Params": {
+					"Centre": "(0+0i)",
+					"InnerRadius": 0,
+					"InnerRotationDegree": 0,
+					"NCount": 0,
+					"Radius": 0,
+					"Randomnoss": false,
+					"RotationDegree": 0,
+					"Type": 0
+				}
+			},
+			{
+				"Name": "PICO",
+				"Hmin": 20,
+				"Hmax": 25,
+				"Count": 10,
+				"NodeIDs": [
+					10,
+					11,
+					12,
+					13,
+					14,
+					15,
+					16,
+					17,
+					18,
+					19
+				],
+				"Params": {
+					"Centre": "(0+0i)",
+					"InnerRadius": 0,
+					"InnerRotationDegree": 0,
+					"NCount": 0,
+					"Radius": 0,
+					"Randomnoss": false,
+					"RotationDegree": 0,
+					"Type": 0
+				}
+			}
+		],
+		"CoverageRegion": {
+			"Celltype": 0,
+			"Dimensions": [
+				141.50944
+			]
+		},
+		"TxNodeNames": [
+			"PICO"
+		],
+		"RxNodeNames": [
+			"UE"
+		]
+	},
+	"Nodes": [
+		{
+			"ID": 1,
+			"NodeObj": {
+				"Type": "UE",
+				"ID": 1,
+				"Location": {
+					"X": 130.72419658897613,
+					"Y": 20.18450688698934,
+					"Z": 0
+				},
+				"Height": 3.0162880690905918,
+				"Meta": "",
+				"Indoor": false,
+				"Orientation": [
+					0,
+					0
+				],
+				"AntennaType": 0,
+				"FreqGHz": [
+					2.1
+				],
+				"TxRxMode": 1
+			}
+		},
+		{
+			"ID": 4,
+			"NodeObj": {
+				"Type": "UE",
+				"ID": 4,
+				"Location": {
+					"X": -111.8203813067119,
+					"Y": -80.98130232290612,
+					"Z": 0
+				},
+				"Height": 6.740853095800652,
+				"Meta": "",
+				"Indoor": false,
+				"Orientation": [
+					0,
+					0
+				],
+				"AntennaType": 0,
+				"FreqGHz": [
+					2.1
+				],
+				"TxRxMode": 1
+			}
+		},
+		{
+			"ID": 9,
+			"NodeObj": {
+				"Type": "UE",
+				"ID": 9,
+				"Location": {
+					"X": 35.67383526854092,
+					"Y": 122.01602398413539,
+					"Z": 0
+				},
+				"Height": 5.381254215817593,
+				"Meta": "",
+				"Indoor": false,
+				"Orientation": [
+					0,
+					0
+				],
+				"AntennaType": 0,
+				"FreqGHz": [
+					2.1
+				],
+				"TxRxMode": 1
+			}
+		},
+		{
+			"ID": 14,
+			"NodeObj": {
+				"Type": "PICO",
+				"ID": 14,
+				"Location": {
+					"X": -23.0974383607432,
+					"Y": -97.6243888556429,
+					"Z": 0
+				},
+				"Height": 21.10273003649797,
+				"Meta": "",
+				"Indoor": false,
+				"Orientation": [
+					0,
+					0
+				],
+				"AntennaType": 1,
+				"FreqGHz": [
+					2.1,
+					1.8,
+					3.4
+				],
+				"TxRxMode": 0
+			}
+		},
+		{
+			"ID": 17,
+			"NodeObj": {
+				"Type": "PICO",
+				"ID": 17,
+				"Location": {
+					"X": 68.33823815595332,
+					"Y": 122.82375555571868,
+					"Z": 0
+				},
+				"Height": 22.837751331533852,
+				"Meta": "",
+				"Indoor": false,
+				"Orientation": [
+					0,
+					0
+				],
+				"AntennaType": 1,
+				"FreqGHz": [
+					2.1,
+					1.8,
+					3.4
+				],
+				"TxRxMode": 0
+			}
+		},
+		{
+			"ID": 19,
+			"NodeObj": {
+				"Type": "PICO",
+				"ID": 19,
+				"Location": {
+					"X": 91.53073744893776,
+					"Y": 30.178008983958808,
+					"Z": 0
+				},
+				"Height": 24.269747824001385,
+				"Meta": "",
+				"Indoor": false,
+				"Orientation": [
+					0,
+					0
+				],
+				"AntennaType": 1,
+				"FreqGHz": [
+					2.1,
+					1.8,
+					3.4
+				],
+				"TxRxMode": 0
+			}
+		},
+		{
+			"ID": 0,
+			"NodeObj": {
+				"Type": "UE",
+				"ID": 0,
+				"Location": {
+					"X": 123.91603325683556,
+					"Y": -63.78899074976138,
+					"Z": 0
+				},
+				"Height": 4.070380045490319,
+				"Meta": "",
+				"Indoor": false,
+				"Orientation": [
+					0,
+					0
+				],
+				"AntennaType": 0,
+				"FreqGHz": [
+					2.1
+				],
+				"TxRxMode": 1
+			}
+		},
+		{
+			"ID": 5,
+			"NodeObj": {
+				"Type": "UE",
+				"ID": 5,
+				"Location": {
+					"X": -95.0959050368904,
+					"Y": 94.69891701903103,
+					"Z": 0
+				},
+				"Height": 3.148105650291517,
+				"Meta": "",
+				"Indoor": false,
+				"Orientation": [
+					0,
+					0
+				],
+				"AntennaType": 0,
+				"FreqGHz": [
+					2.1
+				],
+				"TxRxMode": 1
+			}
+		},
+		{
+			"ID": 7,
+			"NodeObj": {
+				"Type": "UE",
+				"ID": 7,
+				"Location": {
+					"X": 115.09448985819978,
+					"Y": -18.47312180615264,
+					"Z": 0
+				},
+				"Height": 5.824409469689509,
+				"Meta": "",
+				"Indoor": false,
+				"Orientation": [
+					0,
+					0
+				],
+				"AntennaType": 0,
+				"FreqGHz": [
+					2.1
+				],
+				"TxRxMode": 1
+			}
+		},
+		{
+			"ID": 16,
+			"NodeObj": {
+				"Type": "PICO",
+				"ID": 16,
+				"Location": {
+					"X": 23.47890256333955,
+					"Y": -87.09127154844785,
+					"Z": 0
+				},
+				"Height": 22.209830015902316,
+				"Meta": "",
+				"Indoor": false,
+				"Orientation": [
+					0,
+					0
+				],
+				"AntennaType": 1,
+				"FreqGHz": [
+					2.1,
+					1.8,
+					3.4
+				],
+				"TxRxMode": 0
+			}
+		},
+		{
+			"ID": 18,
+			"NodeObj": {
+				"Type": "PICO",
+				"ID": 18,
+				"Location": {
+					"X": -32.09249622677733,
+					"Y": -103.72693676756127,
+					"Z": 0
+				},
+				"Height": 21.9903016541913,
+				"Meta": "",
+				"Indoor": false,
+				"Orientation": [
+					0,
+					0
+				],
+				"AntennaType": 1,
+				"FreqGHz": [
+					2.1,
+					1.8,
+					3.4
+				],
+				"TxRxMode": 0
+			}
+		},
+		{
+			"ID": 3,
+			"NodeObj": {
+				"Type": "UE",
+				"ID": 3,
+				"Location": {
+					"X": -102.79775839662855,
+					"Y": -6.2138009893481385,
+					"Z": 0
+				},
+				"Height": 5.84742832713032,
+				"Meta": "",
+				"Indoor": false,
+				"Orientation": [
+					0,
+					0
+				],
+				"AntennaType": 0,
+				"FreqGHz": [
+					2.1
+				],
+				"TxRxMode": 1
+			}
+		},
+		{
+			"ID": 6,
+			"NodeObj": {
+				"Type": "UE",
+				"ID": 6,
+				"Location": {
+					"X": 6.835111645381306,
+					"Y": -124.02960501703635,
+					"Z": 0
+				},
+				"Height": 3.694497694784457,
+				"Meta": "",
+				"Indoor": false,
+				"Orientation": [
+					0,
+					0
+				],
+				"AntennaType": 0,
+				"FreqGHz": [
+					2.1
+				],
+				"TxRxMode": 1
+			}
+		},
+		{
+			"ID": 8,
+			"NodeObj": {
+				"Type": "UE",
+				"ID": 8,
+				"Location": {
+					"X": -81.3790546485618,
+					"Y": 44.09453761623115,
+					"Z": 0
+				},
+				"Height": 8.572616136218377,
+				"Meta": "",
+				"Indoor": false,
+				"Orientation": [
+					0,
+					0
+				],
+				"AntennaType": 0,
+				"FreqGHz": [
+					2.1
+				],
+				"TxRxMode": 1
+			}
+		},
+		{
+			"ID": 12,
+			"NodeObj": {
+				"Type": "PICO",
+				"ID": 12,
+				"Location": {
+					"X": 117.48526358014165,
+					"Y": 77.52609362008371,
+					"Z": 0
+				},
+				"Height": 23.84439416285048,
+				"Meta": "",
+				"Indoor": false,
+				"Orientation": [
+					0,
+					0
+				],
+				"AntennaType": 1,
+				"FreqGHz": [
+					2.1,
+					1.8,
+					3.4
+				],
+				"TxRxMode": 0
+			}
+		},
+		{
+			"ID": 13,
+			"NodeObj": {
+				"Type": "PICO",
+				"ID": 13,
+				"Location": {
+					"X": 94.71977763016193,
+					"Y": 13.609397665762133,
+					"Z": 0
+				},
+				"Height": 24.680635962270138,
+				"Meta": "",
+				"Indoor": false,
+				"Orientation": [
+					0,
+					0
+				],
+				"AntennaType": 1,
+				"FreqGHz": [
+					2.1,
+					1.8,
+					3.4
+				],
+				"TxRxMode": 0
+			}
+		},
+		{
+			"ID": 2,
+			"NodeObj": {
+				"Type": "UE",
+				"ID": 2,
+				"Location": {
+					"X": -41.17449316307226,
+					"Y": 111.75599494362724,
+					"Z": 0
+				},
+				"Height": 4.535672700800209,
+				"Meta": "",
+				"Indoor": false,
+				"Orientation": [
+					0,
+					0
+				],
+				"AntennaType": 0,
+				"FreqGHz": [
+					2.1
+				],
+				"TxRxMode": 1
+			}
+		},
+		{
+			"ID": 10,
+			"NodeObj": {
+				"Type": "PICO",
+				"ID": 10,
+				"Location": {
+					"X": 82.32468035127737,
+					"Y": -37.72229840619107,
+					"Z": 0
+				},
+				"Height": 22.85889067723453,
+				"Meta": "",
+				"Indoor": false,
+				"Orientation": [
+					0,
+					0
+				],
+				"AntennaType": 1,
+				"FreqGHz": [
+					2.1,
+					1.8,
+					3.4
+				],
+				"TxRxMode": 0
+			}
+		},
+		{
+			"ID": 11,
+			"NodeObj": {
+				"Type": "PICO",
+				"ID": 11,
+				"Location": {
+					"X": 108.02493208067162,
+					"Y": 37.340879520114065,
+					"Z": 0
+				},
+				"Height": 21.692568521522727,
+				"Meta": "",
+				"Indoor": false,
+				"Orientation": [
+					0,
+					0
+				],
+				"AntennaType": 1,
+				"FreqGHz": [
+					2.1,
+					1.8,
+					3.4
+				],
+				"TxRxMode": 0
+			}
+		},
+		{
+			"ID": 15,
+			"NodeObj": {
+				"Type": "PICO",
+				"ID": 15,
+				"Location": {
+					"X": -129.38307815731045,
+					"Y": 9.097932789340561,
+					"Z": 0
+				},
+				"Height": 21.074298898156076,
+				"Meta": "",
+				"Indoor": false,
+				"Orientation": [
+					0,
+					0
+				],
+				"AntennaType": 1,
+				"FreqGHz": [
+					2.1,
+					1.8,
+					3.4
+				],
+				"TxRxMode": 0
+			}
+		}
+	],
+	"LastID": 20
+}
