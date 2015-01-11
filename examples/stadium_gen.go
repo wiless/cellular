@@ -55,7 +55,7 @@ func main() {
 	SingleCellDeploy(&singlecell)
 
 	/// Save deployment
-	vlib.SaveStructure(&singlecell, "stadiumOut.json", true)
+	vlib.SaveStructure(&singlecell, "stadium.json", true)
 
 	// fb, err := singlecell.MarshalJSON()
 	// fmt.Println(err, "\n", string(fb))
@@ -220,7 +220,7 @@ func SingleCellDeploy(system *deployment.DropSystem) {
 	InnerArea := math.Pi * StadiumInnerRadius * StadiumInnerRadius
 	MinDistance := 20.0 / 2
 	PicoCount := int(math.Ceil((OuterArea - InnerArea) / (math.Pi * MinDistance * MinDistance)))
-	PicoCount = 2
+	PicoCount = 10
 	log.Println("Total Nodes Per Ring", PicoCount)
 
 	setting.AddNodeType(deployment.NodeType{Name: "UE", Hmin: 1.0, Hmax: 10.0, Count: 10})
@@ -277,6 +277,8 @@ func SingleCellDeploy(system *deployment.DropSystem) {
 
 	system.SetAllNodeProperty("UE", "AntennaType", 0)
 	system.SetAllNodeProperty("PICO", "AntennaType", 1) /// Set All Pico to use antenna Type 0
+	// fvec := vlib.VectorF{2.1, 1.8, 3.4}
+	// system.SetAllNodeProperty("PICO", "FreqGHz", fvec) /// Set All Pico to use antenna Type 0
 
 	matlab.Export("ue", system.Locations("UE"))
 	matlab.Export("pico", system.Locations("PICO"))

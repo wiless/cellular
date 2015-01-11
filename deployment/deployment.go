@@ -42,8 +42,8 @@ type Node struct {
 	Indoor      bool
 	Orientation vlib.VectorF
 	AntennaType int
-	Frequency   vlib.VectorF `json:"FreqGHz"`
-	Mode        TxRxMode     `json:"TxRxMode"`
+	FreqGHz     vlib.VectorF
+	Mode        TxRxMode `json:"TxRxMode"`
 }
 
 type DropParameter struct {
@@ -255,7 +255,7 @@ func (d *DropSystem) NewNode(ntype string) *Node {
 	node := new(Node)
 	node.Type = notype.Name
 	node.Indoor = false
-	node.Frequency = []float64{FcInGHz}
+	node.FreqGHz = []float64{FcInGHz}
 	node.AntennaType = 0
 	node.Orientation = []float64{0, 0} /// Horizontal, Vertical orientation in degree
 	node.Mode = Inactive

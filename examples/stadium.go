@@ -33,8 +33,8 @@ type LinkInfo struct {
 type LinkMetric struct {
 	RxID         int
 	Frequency    float64
-	BestRSSI     float64
-	BestRSSINode int
+	RSSI         float64
+	RSSINode     int
 	BestRSRP     float64
 	BestRSRPNode int
 	BestSINR     float64
@@ -74,7 +74,6 @@ func main() {
 
 	/// Generate Different Antenna Types for every Transmit Node
 	systemAntennas = make(map[int]antenna.SettingAAS)
-
 	vlib.LoadMapStructure("antennas.json", systemAntennas)
 
 	knownAntennaTypes := vlib.GetIntKeys(systemAntennas)
@@ -93,10 +92,13 @@ func main() {
 
 	// vlib.SaveMapStructure(systemAntennas, "antennas.json", true)
 	rxids := singlecell.GetNodeIDs("UE")
-	EvaluteMetric(&singlecell, &model, rxids[0])
-	EvaluteMetric(&singlecell, &model, rxids[1])
-	EvaluteMetric(&singlecell, &model, rxids[2])
-
+	fmt.Println("All rxnodes ", rxids)
+	metrics := EvaluteMetric(&singlecell, &model, rxids[0])
+	fmt.Printf("\n %#v \n", metrics)
+	metrics = EvaluteMetric(&singlecell, &model, rxids[1])
+	fmt.Printf("\n %#v \n", metrics)
+	metrics = EvaluteMetric(&singlecell, &model, rxids[2])
+	fmt.Printf("\n %#v \n", metrics)
 	// ueLinkInfo := CalculatePathLoss(&singlecell, &model)
 
 	// rssi := vlib.NewVectorF(len(ueLinkInfo))
@@ -123,60 +125,79 @@ func EvaluteMetric(singlecell *deployment.DropSystem, model *pathloss.PathLossMo
 
 	var PerFreqLink map[float64]LinkMetric
 	PerFreqLink = make(map[float64]LinkMetric)
-	result := make([]LinkMetric, 1)
-	rxnode := singlecell.Nodes[rxid]
-	// nfrequencies := len(rxnode.Frequency)
-	log.Printf("Rx Supports %3.2fGHz", rxnode.Frequency)
-	txnodeTypes := singlecell.GetTxNodeNames()
 
+	rxnode := singlecell.Nodes[rxid]
+
+	// nfrequencies := len(rxnode.Frequency)
+	log.Printf("Rx Supports %3.2fGHz", rxnode.FreqGHz)
+	txnodeTypes := singlecell.GetTxNodeNames()
 	var alltxNodeIds vlib.VectorI
 	for i := 0; i < len(txnodeTypes); i++ {
 		alltxNodeIds.AppendAtEnd(singlecell.GetNodeIDs(txnodeTypes[i])...)
 	}
 
-	for _, f := range rxnode.Frequency {
+	for _, f := range rxnode.FreqGHz {
 		var link LinkMetric
 
 		link.Frequency = f
 		link.RxID = rxid
-		link.BestRSSINode = -1
-		link.BestRSSI = -1000
+		link.RSSINode = -1
+		link.RSSI = -1000
+		link.BestRSRP = -1000
 		model.FreqHz = f * 1e9
 		nlinks := 0
+		link.RSSINode = 0
 		for _, val := range alltxNodeIds {
 
 			txnode := singlecell.Nodes[val]
 
-			if found, _ := vlib.Contains(txnode.Frequency, f); found {
+			if found, _ := vlib.Contains(txnode.FreqGHz, f); found {
 				nlinks++
-
 				antenna := systemAntennas[txnode.AntennaType]
 				antenna.HTiltAngle, antenna.VTiltAngle = txnode.Orientation[0], txnode.Orientation[1]
-				// fmt.Printf("\n For Rx(%d) %s [%d]. antenna = %v", info.RxID, name, txnids[k], antenna)
 				antenna.CreateElements(txnode.Location)
-				distance, _, _ := vlib.RelativeGeo(txnode.Location, rxnode.Location)
 
+				distance, _, _ := vlib.RelativeGeo(txnode.Location, rxnode.Location)
 				lossDb := model.LossInDb(distance)
+
 				aasgain, _, _ := antenna.AASGain(rxnode.Location) /// linear scale
 				totalGainDb := vlib.Db(aasgain) - lossDb
-				if totalGainDb > link.BestRSSI {
-					link.BestRSSI = totalGainDb
+				// if totalGainDb > link.RSSI {
+				link.RSSI = vlib.Db(vlib.InvDb(link.RSSI) + vlib.InvDb(totalGainDb))
+				link.RSSINode++
+				// }
+				if totalGainDb > link.BestRSRP {
+					link.BestRSRP = totalGainDb
 					link.BestRSRPNode = txnode.ID
 				}
-				fmt.Printf("\n Rx %d :  Tx Node  %d : Link @ %3.2fGHz  : %-4.3fdB", rxid, val, f, link.BestRSSI)
+
+				fmt.Printf("\n Rx %d :  Tx Node  %d : Link @ %3.2fGHz  : %-4.3fdB", rxid, val, f, totalGainDb)
 
 			} else {
-				log.Printf("Rx %d :  Tx Node  %d : No Link on %3.2fGHz", rxid, val, f)
+				fmt.Printf("\n Rx %d :  Tx Node  %d : No Link on %3.2fGHz", rxid, val, f)
 
 			}
 		}
+		link.BestSINR = vlib.Db(vlib.InvDb(link.BestRSRP) / (vlib.InvDb(link.RSSI) - vlib.InvDb(link.BestRSRP)))
+		link.BestSINRNode = link.BestRSRPNode
 		if nlinks > 0 {
 			PerFreqLink[f] = link
 		}
 
 	}
-	if len(PerFreqLink) != 0 {
-		fmt.Println(PerFreqLink)
+	// if len(PerFreqLink) != 0 {
+	// 	fmt.Println(PerFreqLink)
+	// }
+	result := make([]LinkMetric, len(PerFreqLink))
+
+	var indx int = 0
+	for _, val := range PerFreqLink {
+
+		result[indx] = val
+		indx++
+	}
+	if len(rxnode.FreqGHz) == 0 {
+		log.Panicf("\nNode %d (%s) does not support any Carrier Frequency !!", rxid, rxnode.Type)
 	}
 
 	return result

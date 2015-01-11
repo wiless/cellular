@@ -43,8 +43,11 @@ func main() {
 		fmt.Printf("\nLocations %f", vcell1[i].GetElements())
 	}
 
-	var RxLocation vlib.Location3D{10,10,5}
+	RxLocation := vlib.Location3D{10, 10, 5}
 
-	fmt.Printf("Rxcomponent from all Elements : %f",vcell[0].GetRxPhase(RxLocation)
+	fmt.Printf("\nRxcomponent from all Elements : %f", vcell1[0].GetRxPhase(RxLocation))
+	vlib.Sum(v)
+	gain, _, _ := vcell1[0].AASGain(RxLocation)
+	fmt.Printf("\nRxcomponent from all Elements : %fdB", vlib.Db(gain))
 
 }
