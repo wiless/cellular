@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/grd/statistics"
+	cell "github.com/wiless/cellular"
 	"github.com/wiless/cellular/antenna"
 	"github.com/wiless/cellular/deployment"
 	"github.com/wiless/cellular/pathloss"
@@ -22,24 +22,6 @@ var systemAntennas map[int]antenna.SettingAAS
 // Dimension
 // Outer Diameter : 283.01887m = 141.50944
 // Inner Diameter : 174.5283m = 87.26415
-type LinkInfo struct {
-	RxID              int
-	NodeTypes         []string
-	LinkGain          vlib.VectorF
-	LinkGainNode      vlib.VectorI
-	InterferenceLinks vlib.VectorF
-}
-
-type LinkMetric struct {
-	RxID         int
-	Frequency    float64
-	RSSI         float64
-	RSSINode     int
-	BestRSRP     float64
-	BestRSRPNode int
-	BestSINR     float64
-	BestSINRNode int
-}
 
 var angles vlib.VectorF = vlib.VectorF{45, -45, -135, -45}
 
@@ -74,6 +56,7 @@ func main() {
 
 	/// Generate Different Antenna Types for every Transmit Node
 	systemAntennas = make(map[int]antenna.SettingAAS)
+
 	vlib.LoadMapStructure("antennas.json", systemAntennas)
 
 	knownAntennaTypes := vlib.GetIntKeys(systemAntennas)
@@ -92,13 +75,23 @@ func main() {
 
 	// vlib.SaveMapStructure(systemAntennas, "antennas.json", true)
 	rxids := singlecell.GetNodeIDs("UE")
-	fmt.Println("All rxnodes ", rxids)
-	metrics := EvaluteMetric(&singlecell, &model, rxids[0])
-	fmt.Printf("\n %#v \n", metrics)
-	metrics = EvaluteMetric(&singlecell, &model, rxids[1])
-	fmt.Printf("\n %#v \n", metrics)
-	metrics = EvaluteMetric(&singlecell, &model, rxids[2])
-	fmt.Printf("\n %#v \n", metrics)
+	type MFNMetric []cell.LinkMetric
+	MetricPerRx := make(map[int]MFNMetric)
+	var AllMetrics MFNMetric
+	for _, rxid := range rxids {
+		metrics := EvaluteMetric(&singlecell, &model, rxid)
+		if len(metrics) > 1 {
+			log.Printf("%s[%d] Supports %d Carriers", "UE", rxid, len(metrics))
+			// log.Printf("%s[%d] Links %#v ", "UE", rxid, metrics)
+		}
+		AllMetrics = append(AllMetrics, metrics...)
+		MetricPerRx[rxid] = metrics
+	}
+	vlib.SaveMapStructure2(MetricPerRx, "cell.LinkMetric.json", "UE", "cell.LinkMetric", true)
+	vlib.SaveStructure(AllMetrics, "cell.LinkMetric2.json", true)
+
+	// CreateChannelLinks()
+
 	// ueLinkInfo := CalculatePathLoss(&singlecell, &model)
 
 	// rssi := vlib.NewVectorF(len(ueLinkInfo))
@@ -121,161 +114,179 @@ func main() {
 
 /// Calculate Pathloss
 
-func EvaluteMetric(singlecell *deployment.DropSystem, model *pathloss.PathLossModel, rxid int) []LinkMetric {
-
-	var PerFreqLink map[float64]LinkMetric
-	PerFreqLink = make(map[float64]LinkMetric)
-
+func EvaluteMetric(singlecell *deployment.DropSystem, model *pathloss.PathLossModel, rxid int) []cell.LinkMetric {
+	BandwidthMHz := 20.0
+	NoisePSDdBm := -173.9
+	N0 := NoisePSDdBm + vlib.Db(BandwidthMHz*1e6)
+	var PerFreqLink map[float64]cell.LinkMetric
+	PerFreqLink = make(map[float64]cell.LinkMetric)
 	rxnode := singlecell.Nodes[rxid]
-
 	// nfrequencies := len(rxnode.Frequency)
-	log.Printf("Rx Supports %3.2fGHz", rxnode.FreqGHz)
+	// log.SetOutput(os.Stderr)
+	log.Printf("%s[%d] Supports %3.2f GHz", rxnode.Type, rxnode.ID, rxnode.FreqGHz)
 	txnodeTypes := singlecell.GetTxNodeNames()
+
 	var alltxNodeIds vlib.VectorI
 	for i := 0; i < len(txnodeTypes); i++ {
 		alltxNodeIds.AppendAtEnd(singlecell.GetNodeIDs(txnodeTypes[i])...)
 	}
 
 	for _, f := range rxnode.FreqGHz {
-		var link LinkMetric
+		var link cell.LinkMetric
 
-		link.Frequency = f
-		link.RxID = rxid
-		link.RSSINode = -1
-		link.RSSI = -1000
+		link.FreqInGHz = f
+		link.RxNodeID = rxid
 		link.BestRSRP = -1000
+		link.N0 = N0
+		link.BandwidthMHz = BandwidthMHz
 		model.FreqHz = f * 1e9
 		nlinks := 0
-		link.RSSINode = 0
 		for _, val := range alltxNodeIds {
-
+			txnodeID := val
 			txnode := singlecell.Nodes[val]
 
 			if found, _ := vlib.Contains(txnode.FreqGHz, f); found {
 				nlinks++
+				link.TxNodeIDs.AppendAtEnd(txnodeID)
 				antenna := systemAntennas[txnode.AntennaType]
+				antenna.Freq = f * 1.0e9
+
 				antenna.HTiltAngle, antenna.VTiltAngle = txnode.Orientation[0], txnode.Orientation[1]
+				// fmt.Printf("\n For Rx(%d) %s [%d]. antenna = %v", info.RxID, name, txnids[k], antenna)
 				antenna.CreateElements(txnode.Location)
-
 				distance, _, _ := vlib.RelativeGeo(txnode.Location, rxnode.Location)
-				lossDb := model.LossInDb(distance)
 
+				lossDb := model.LossInDb(distance)
 				aasgain, _, _ := antenna.AASGain(rxnode.Location) /// linear scale
 				totalGainDb := vlib.Db(aasgain) - lossDb
-				// if totalGainDb > link.RSSI {
-				link.RSSI = vlib.Db(vlib.InvDb(link.RSSI) + vlib.InvDb(totalGainDb))
-				link.RSSINode++
-				// }
-				if totalGainDb > link.BestRSRP {
-					link.BestRSRP = totalGainDb
-					link.BestRSRPNode = txnode.ID
-				}
+				link.TxNodesRSRP.AppendAtEnd(totalGainDb)
 
-				fmt.Printf("\n Rx %d :  Tx Node  %d : Link @ %3.2fGHz  : %-4.3fdB", rxid, val, f, totalGainDb)
+				log.Printf("%s[%d] : TxNode %d : Link @ %3.2fGHz  : %-4.3fdB", rxnode.Type, rxid, val, f, totalGainDb)
 
 			} else {
-				fmt.Printf("\n Rx %d :  Tx Node  %d : No Link on %3.2fGHz", rxid, val, f)
+				log.Printf("%s[%d] : TxNode %d : No Link on %3.2fGHz", rxnode.Type, rxid, val, f)
 
 			}
 		}
-		link.BestSINR = vlib.Db(vlib.InvDb(link.BestRSRP) / (vlib.InvDb(link.RSSI) - vlib.InvDb(link.BestRSRP)))
-		link.BestSINRNode = link.BestRSRPNode
+
+		/// Do the statistics here
 		if nlinks > 0 {
+			link.N0 = N0
+			link.BandwidthMHz = BandwidthMHz
+
+			rsrpLinr := vlib.InvDbF(link.TxNodesRSRP)
+			totalrssi := vlib.Sum(rsrpLinr) + vlib.InvDb(link.N0)
+			maxrsrp := vlib.Max(rsrpLinr)
+
+			// if nlinks == 1 {
+			// 	link.BestSINR = vlib.Db(maxrsrp) - N0
+			// 	// +1000 /// s/i = MAX value
+			// } else {
+			link.BestSINR = vlib.Db(maxrsrp / (totalrssi - maxrsrp))
+			// }
+			val, sindx := vlib.Sorted(link.TxNodesRSRP)
+
+			// fmt.Println("Sorted TxNodes & Values : ", link.TxNodeIDs, link.TxNodesRSRP)
+			link.TxNodesRSRP = val
+			link.TxNodeIDs = link.TxNodeIDs.At(sindx)
+			// fmt.Println("Sorted TxNodes & Values : ", link.TxNodeIDs, link.TxNodesRSRP)
+
+			link.RSSI = vlib.Db(totalrssi)
+			link.BestRSRP = vlib.Db(maxrsrp)
+			link.BestRSRPNode = link.TxNodeIDs[0]
 			PerFreqLink[f] = link
 		}
 
 	}
-	// if len(PerFreqLink) != 0 {
-	// 	fmt.Println(PerFreqLink)
-	// }
-	result := make([]LinkMetric, len(PerFreqLink))
-
-	var indx int = 0
+	result := make([]cell.LinkMetric, len(PerFreqLink))
+	var cnt int = 0
 	for _, val := range PerFreqLink {
 
-		result[indx] = val
-		indx++
+		result[cnt] = val
+		cnt++
 	}
-	if len(rxnode.FreqGHz) == 0 {
-		log.Panicf("\nNode %d (%s) does not support any Carrier Frequency !!", rxid, rxnode.Type)
-	}
+
+	// if len(PerFreqLink) != 0 {
+
+	// 	log.Printf("%#v", PerFreqLink)
+	// }
 
 	return result
 }
 
-func CalculatePathLoss(singlecell *deployment.DropSystem, model *pathloss.PathLossModel) []LinkInfo {
-	txNodeNames := singlecell.GetTxNodeNames()
-	rxNodeNames := singlecell.GetRxNodeNames()
+// func CalculatePathLoss(singlecell *deployment.DropSystem, model *pathloss.PathLossModel) []LinkInfo {
+// 	txNodeNames := singlecell.GetTxNodeNames()
+// 	rxNodeNames := singlecell.GetRxNodeNames()
 
-	// rxlocs := singlecell.Locations("UE")
-	rxlocs3D := singlecell.Locations3D(rxNodeNames[0])
-	RxLinkInfo := make([]LinkInfo, len(rxlocs3D))
+// 	// rxlocs := singlecell.Locations("UE")
+// 	rxlocs3D := singlecell.Locations3D(rxNodeNames[0])
+// 	RxLinkInfo := make([]LinkInfo, len(rxlocs3D))
 
-	/// Generate Shadow Grid
+// 	/// Generate Shadow Grid
 
-	// fmt.Printf("SETTING %s", singlecell.CoverageRegion.Celltype)
+// 	// fmt.Printf("SETTING %s", singlecell.CoverageRegion.Celltype)
 
-	// shwGrid := vlib.NewMatrixF(rows, cols)
-	// for i := 0; i < len(rxlocs3D); i++ {
-	// 	rxlocation := rxlocs3D[i]
-	// 	var info LinkInfo
-	// 	info.RxID = i
-	// }
+// 	// shwGrid := vlib.NewMatrixF(rows, cols)
+// 	// for i := 0; i < len(rxlocs3D); i++ {
+// 	// 	rxlocation := rxlocs3D[i]
+// 	// 	var info LinkInfo
+// 	// 	info.RxID = i
+// 	// }
 
-	//	var pathLossPerRxNode map[int]vlib.VectorF
-	//pathLossPerRxNode = make(map[int]vlib.VectorF)
-	//log.Println(pathLossPerRxNode)
-	for i := 0; i < len(rxlocs3D); i++ {
-		rxlocation := rxlocs3D[i]
-		var info LinkInfo
+// 	//	var pathLossPerRxNode map[int]vlib.VectorF
+// 	//pathLossPerRxNode = make(map[int]vlib.VectorF)
+// 	//log.Println(pathLossPerRxNode)
+// 	for i := 0; i < len(rxlocs3D); i++ {
+// 		rxlocation := rxlocs3D[i]
+// 		var info LinkInfo
 
-		func(rxlocation vlib.Location3D, txNodeNames []string) {
-			info.NodeTypes = make([]string, len(txNodeNames))
-			info.LinkGain = vlib.NewVectorF(len(txNodeNames))
-			info.LinkGainNode = vlib.NewVectorI(len(txNodeNames))
-			info.InterferenceLinks = vlib.NewVectorF(len(txNodeNames))
+// 		func(rxlocation vlib.Location3D, txNodeNames []string) {
+// 			info.NodeTypes = make([]string, len(txNodeNames))
+// 			info.LinkGain = vlib.NewVectorF(len(txNodeNames))
+// 			info.LinkGainNode = vlib.NewVectorI(len(txNodeNames))
+// 			info.InterferenceLinks = vlib.NewVectorF(len(txNodeNames))
 
-			for indx, name := range txNodeNames {
-				txlocs := singlecell.Locations(name)
-				txLocs3D := singlecell.Locations3D(name)
+// 			for indx, name := range txNodeNames {
+// 				txlocs := singlecell.Locations(name)
+// 				txLocs3D := singlecell.Locations3D(name)
 
-				allpathlossPerTxType := vlib.NewVectorF((txlocs.Size()))
+// 				allpathlossPerTxType := vlib.NewVectorF((txlocs.Size()))
 
-				info.NodeTypes[indx] = name
-				N := txlocs.Size()
-				txnids := singlecell.GetNodeIDs(name)
-				for k := 0; k < N; k++ {
-					node := singlecell.Nodes[txnids[k]]
-					aid := node.AntennaType
-					// antenna:= systemAntennas[txn]
-					// angle := float64((k) * 360 / N)
+// 				info.NodeTypes[indx] = name
+// 				N := txlocs.Size()
+// 				txnids := singlecell.GetNodeIDs(name)
+// 				for k := 0; k < N; k++ {
+// 					node := singlecell.Nodes[txnids[k]]
+// 					aid := node.AntennaType
+// 					// antenna:= systemAntennas[txn]
+// 					// angle := float64((k) * 360 / N)
 
-					antenna := systemAntennas[aid]
-					antenna.HTiltAngle, antenna.VTiltAngle = node.Orientation[0], node.Orientation[1]
-					// fmt.Printf("\n For Rx(%d) %s [%d]. antenna = %v", info.RxID, name, txnids[k], antenna)
-					antenna.CreateElements(txLocs3D[k])
-					distance, _, _ := vlib.RelativeGeo(txLocs3D[k], rxlocation)
-					lossDb := model.LossInDb(distance)
-					aasgain, _, _ := antenna.AASGain(rxlocation) /// linear scale
-					totalGainDb := vlib.Db(aasgain) - lossDb
-					allpathlossPerTxType[k] = totalGainDb
+// 					antenna := systemAntennas[aid]
+// 					antenna.HTiltAngle, antenna.VTiltAngle = node.Orientation[0], node.Orientation[1]
+// 					// fmt.Printf("\n For Rx(%d) %s [%d]. antenna = %v", info.RxID, name, txnids[k], antenna)
+// 					antenna.CreateElements(txLocs3D[k])
+// 					distance, _, _ := vlib.RelativeGeo(txLocs3D[k], rxlocation)
+// 					lossDb := model.LossInDb(distance)
+// 					aasgain, _, _ := antenna.AASGain(rxlocation) /// linear scale
+// 					totalGainDb := vlib.Db(aasgain) - lossDb
+// 					allpathlossPerTxType[k] = totalGainDb
 
-					// fmt.Printf("\n Distance %f : loss %f dB", distance, lossDb)
-					// matlab.Export(matstr, data)
-				}
-				data := statistics.Float64(allpathlossPerTxType)
-				info.LinkGain[indx], info.LinkGainNode[indx] = statistics.Max(&data) // dB
-				info.InterferenceLinks[indx] = vlib.Db(vlib.Sum(vlib.InvDbF(allpathlossPerTxType)) - vlib.InvDb(info.LinkGain[indx]))
+// 					// fmt.Printf("\n Distance %f : loss %f dB", distance, lossDb)
+// 					// matlab.Export(matstr, data)
+// 				}
+// 				data := statistics.Float64(allpathlossPerTxType)
+// 				info.LinkGain[indx], info.LinkGainNode[indx] = statistics.Max(&data) // dB
+// 				info.InterferenceLinks[indx] = vlib.Db(vlib.Sum(vlib.InvDbF(allpathlossPerTxType)) - vlib.InvDb(info.LinkGain[indx]))
 
-			}
+// 			}
 
-		}(rxlocation, txNodeNames)
-		RxLinkInfo[i] = info
-		fmt.Printf("\n Info[%d] : %#v", i, info)
-	}
+// 		}(rxlocation, txNodeNames)
+// 		RxLinkInfo[i] = info
+// 		fmt.Printf("\n Info[%d] : %#v", i, info)
+// 	}
 
-	return RxLinkInfo
-}
+// 	return RxLinkInfo
+// }
 
 func SingleCellDeploy(system *deployment.DropSystem) {
 
@@ -350,9 +361,6 @@ func SingleCellDeploy(system *deployment.DropSystem) {
 		system.SetAllNodeLocation("PICO", PICOlocations)
 
 	}
-
-	system.SetAllNodeProperty("UE", "AntennaType", 0)
-	system.SetAllNodeProperty("PICO", "AntennaType", 1) /// Set All Pico to use antenna Type 0
 
 	matlab.Export("ue", system.Locations("UE"))
 	matlab.Export("pico", system.Locations("PICO"))

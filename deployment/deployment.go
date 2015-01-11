@@ -189,7 +189,7 @@ func (d *DropSystem) MarshalJSON() ([]byte, error) {
 	bfr.WriteString(`,"LastID":`)
 	enc.Encode(d.lastID)
 	bfr.WriteString("}")
-
+	fmt.Printf("\n %s ", bfr.Bytes())
 	return bfr.Bytes(), nil
 }
 
