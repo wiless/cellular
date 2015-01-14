@@ -2,10 +2,10 @@ package main
 
 import (
 	"fmt"
+	"github.com/wiless/cellular/pathloss"
+	"github.com/wiless/vlib"
 	"math/rand"
 	"time"
-	"wiless/cellular/pathloss"
-	"wiless/vlib"
 )
 
 var matlab *vlib.Matlab
