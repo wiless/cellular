@@ -8,7 +8,7 @@ import (
 	"reflect"
 
 	ms "github.com/mitchellh/mapstructure"
-	sim "github.com/wiless/cellular"
+	// sim "github.com/wiless/cellular"
 	"github.com/wiless/vlib"
 	"log"
 	"math"
@@ -519,6 +519,10 @@ func (d *DropSystem) SetAllNodeLocation(ntype string, locations vlib.VectorC) {
 	// fmt.Println("No. of Total Nodes is ", len(d.Nodes))
 	// fmt.Println("No. of Locations is ", locations.Size())
 	// fmt.Println("No. of NodeIDs is ", notype)
+	if len(locations) != len(notype.NodeIDs) {
+		log.Panicln("DropSystem::SetAllNodeLocation - #of Nodes", len(notype.NodeIDs), " Arg : Locations", len(locations))
+	}
+
 	for indx, val := range notype.NodeIDs {
 		node := d.Nodes[val]
 		node.Location.FromCmplx(locations[indx])
@@ -557,7 +561,7 @@ func RandPoint(centre complex128, radius float64) complex128 {
 	theta := rand.Float64() * 360
 
 	scale := complex(r, 0)
-	point := scale * sim.GetEJtheta(theta)
+	point := scale * vlib.GetEJtheta(theta)
 	// x := r*math.Cos(theta);
 	// y := r*math.Sin(theta);
 
@@ -571,7 +575,7 @@ func HexagonalPoints(centre complex128, length float64) vlib.VectorC {
 	// degree := 0.0
 	for i := 0; i < 6; i++ {
 
-		result[i] = sim.GetEJtheta(60.0*float64(i))*complex(length, 0) + centre
+		result[i] = vlib.GetEJtheta(60.0*float64(i))*complex(length, 0) + centre
 	}
 
 	return result
@@ -600,7 +604,7 @@ func AnnularPoint(centre complex128, innerRadius, outerRadius float64) complex12
 	theta := rand.Float64() * 360
 
 	scale := complex(r, 0)
-	point := scale * sim.GetEJtheta(theta)
+	point := scale * vlib.GetEJtheta(theta)
 	// x := r*math.Cos(theta);
 	// y := r*math.Sin(theta);
 
@@ -624,7 +628,7 @@ func AnnularRingEqPoints(centre complex128, outerRadius float64, N int) vlib.Vec
 	angleOffset := 360.0 / float64(N)
 	angle := 0.0
 	for i := 0; i < N; i++ {
-		point := complex(outerRadius, 0) * sim.GetEJtheta(angle)
+		point := complex(outerRadius, 0) * vlib.GetEJtheta(angle)
 
 		result[i] = point + centre
 		angle += angleOffset
@@ -649,7 +653,7 @@ func RectangularPoint(centre complex128, width, height, angleInDegree float64) c
 	point := complex(dx, dy) /// centred at 0,0
 	result := point - centre
 
-	return result * sim.GetEJtheta(angleInDegree)
+	return result * vlib.GetEJtheta(angleInDegree)
 
 }
 func RectangularNPoints(centre complex128, width, height, angleInDegree float64, N int) vlib.VectorC {
@@ -668,7 +672,7 @@ func RectangularEqPoints(centre complex128, length, angle float64, N int) vlib.V
 		result[i] = complex(pos, 0)
 		pos += offset
 	}
-	result = result.ScaleC(sim.GetEJtheta(angle))
+	result = result.ScaleC(vlib.GetEJtheta(angle))
 
 	mean := -vlib.MeanC(result) + centre
 	result = result.AddC(mean)

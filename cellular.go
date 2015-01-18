@@ -1,20 +1,12 @@
-package simulation
+package cellular
 
 import (
+	"github.com/wiless/gocomm"
 	"github.com/wiless/vlib"
-	"math"
-	"math/cmplx"
+	"sync"
 )
 
 type GenericStruct map[string]interface{}
-
-func GetEJtheta(degree float64) complex128 {
-	return cmplx.Exp(complex(0.0, -degree*math.Pi/180.0))
-}
-
-func Radian(degree float64) float64 {
-	return degree * math.Pi / 180.0
-}
 
 type LinkInfo struct {
 	RxNodeID          int
@@ -36,4 +28,50 @@ type LinkMetric struct {
 	BestRSRPNode int
 	BestSINR     float64
 	RoIDbm       float64
+}
+
+func (l *LinkMetric) SetParams(fGHz, bwMHz float64) {
+	// BandwidthMHz := 20.0
+	NoisePSDdBmPerHz := -173.9
+	l.N0 = NoisePSDdBmPerHz + vlib.Db(bwMHz*1e6)
+	l.FreqInGHz = fGHz
+}
+
+//CreateLink creates a single tx-rx link with a given SNR with bandwidth=10MHz, Signal power assumed as 0dBm
+//and N0 calculated based on 10MHz bandwidth
+func CreateLink(rxid, txid int, snrDb float64) LinkMetric {
+	var result LinkMetric
+
+	result.SetParams(2.1, 10)
+	result.RxNodeID = rxid
+	result.TxNodeIDs.AppendAtEnd(txid)
+	rssi := snrDb + result.N0
+	result.TxNodesRSRP.AppendAtEnd(rssi)
+	result.RoIDbm = -1000
+	return result
+}
+
+func CreateSimpleLink(rxid, txid int, snrDb float64) LinkMetric {
+	var result LinkMetric
+	result = CreateLink(rxid, txid, snrDb)
+	result.N0 = -snrDb
+	rssi := snrDb + result.N0
+	result.TxNodesRSRP[0] = rssi
+	return result
+}
+
+type Transmitter interface {
+	SetWaitGroup(wg *sync.WaitGroup)
+	GetChannel() gocomm.Complex128AChannel
+	GetID() int
+	StartTransmit()
+	GetSeed() int64
+	IsActive() bool
+}
+
+type Receiver interface {
+	GetID() int
+	SetWaitGroup(wg *sync.WaitGroup)
+	StartReceive(rxch gocomm.Complex128AChannel)
+	IsActive() bool
 }

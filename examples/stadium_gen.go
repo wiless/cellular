@@ -55,7 +55,7 @@ func main() {
 	SingleCellDeploy(&singlecell)
 
 	/// Save deployment
-	vlib.SaveStructure(&singlecell, "stadiumOut.json", true)
+	vlib.SaveStructure(&singlecell, "stadium.json", true)
 
 	// fb, err := singlecell.MarshalJSON()
 	// fmt.Println(err, "\n", string(fb))

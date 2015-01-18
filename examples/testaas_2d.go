@@ -46,7 +46,7 @@ func main() {
 	RxLocation := vlib.Location3D{10, 10, 5}
 
 	fmt.Printf("\nRxcomponent from all Elements : %f", vcell1[0].GetRxPhase(RxLocation))
-	vlib.Sum(v)
+	// vlib.Sum(v)
 	gain, _, _ := vcell1[0].AASGain(RxLocation)
 	fmt.Printf("\nRxcomponent from all Elements : %fdB", vlib.Db(gain))
 

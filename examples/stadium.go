@@ -87,8 +87,8 @@ func main() {
 		AllMetrics = append(AllMetrics, metrics...)
 		MetricPerRx[rxid] = metrics
 	}
-	vlib.SaveMapStructure2(MetricPerRx, "cell.LinkMetric.json", "UE", "cell.LinkMetric", true)
-	vlib.SaveStructure(AllMetrics, "cell.LinkMetric2.json", true)
+	// vlib.SaveMapStructure2(MetricPerRx, "linkmetric.json", "UE", "LinkMetric", true)
+	vlib.SaveStructure(AllMetrics, "linkmetric2.json", true)
 
 	// CreateChannelLinks()
 

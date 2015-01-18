@@ -95,7 +95,9 @@ func CalculatePathLoss(singlecell *deployment.DropSystem, model *pathloss.PathLo
 
 	fmt.Printf("SETTING %s", singlecell.CoverageRegion.Celltype)
 
-	shwGrid := vlib.NewMatrixF(rows, cols)
+	// rows:=20
+	// cols:=20
+	// shwGrid := vlib.NewMatrixF(rows, cols)
 	// for i := 0; i < len(rxlocs3D); i++ {
 	// 	rxlocation := rxlocs3D[i]
 	// 	var info LinkInfo
@@ -132,7 +134,6 @@ func CalculatePathLoss(singlecell *deployment.DropSystem, model *pathloss.PathLo
 						templateAAS.Omni = false
 					} else {
 						templateAAS.HTiltAngle = 0
-
 						templateAAS.Omni = true
 					}
 
@@ -169,22 +170,24 @@ func SingleCellDeploy(system *deployment.DropSystem) {
 	AreaRadius := CellRadius
 	setting.SetCoverage(deployment.CircularCoverage(AreaRadius))
 
-	WAPNodes := 1
+	WAPNodes := 10
 	NCluster := 1
 	ClusterSize := 1
 
-	setting.AddNodeType(deployment.NodeType{Name: "BS", Hmin: 25.0, Hmax: 25.0, Count: 2})
+	setting.AddNodeType(deployment.NodeType{Name: "BS", Hmin: 25.0, Hmax: 25.0, Count: 4})
 	setting.AddNodeType(deployment.NodeType{Name: "UE", Hmin: 0.0, Hmax: 1.5, Count: 5500})
 	setting.AddNodeType(deployment.NodeType{Name: "PICO", Hmin: 0.0, Hmax: 10.0, Count: NCluster * ClusterSize})
+	waptype := deployment.NodeType{Name: "WAP", Hmin: 5, Hmax: 50, Count: WAPNodes}
+	setting.AddNodeType(waptype)
 	/// You can save the settings of this deployment by uncommenting this line
 	system.SetSetting(setting)
 
 	system.Init()
 	setting.SetTxNodeNames("BS", "WAP", "PICO")
 	setting.SetRxNodeNames("UE")
-	vlib.SaveStructure(setting, "nodetype.txt", true)
+	vlib.SaveStructure(setting, "deployment.json", false)
 
-	newsetting := deployment.NewDropSetting()
+	// newsetting := deployment.NewDropSetting()
 	/// Drop UE Nodes
 	{
 
@@ -195,6 +198,7 @@ func SingleCellDeploy(system *deployment.DropSystem) {
 
 	/// Drops the UE in the default coverage mode i.e. Circular Coverage as set above
 	system.DropNodeType("UE")
+	system.DropNodeType("WAP")
 	// fmt.Printf("\nUE = %f", system.Locations("UE"))
 	// fmt.Printf("\nBS = %f", system.Locations("BS"))
 
