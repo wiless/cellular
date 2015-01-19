@@ -41,15 +41,21 @@ type CSVReceiver struct {
 
 func main() {
 
+	var swg SinWaveGenerator
+
+	var csvr CSVReceiver
+	swg.nid, csvr.nid = 0, 1
+
 	// var sisochannel channel.Channel
 	// sisochannel.CreateFromFile("linkmetric2.json")
+
 	links := make([]cellular.LinkMetric, 1)
-	links[0] = cellular.CreateSimpleLink(0, 1, 10)
+
+	links[0] = cellular.CreateSimpleLink(csvr.GetID(), swg.GetID(), 10)
+
 	sisochannel := channel.NewWirelessChannel(links)
 	sisochannel.Init()
 
-	var swg SinWaveGenerator
-	var csvr CSVReceiver
 	swg.Init()
 	{
 
@@ -57,8 +63,9 @@ func main() {
 		var rx cellular.Receiver
 		tx = &swg
 		rx = &csvr
-		sisochannel.SetTransmiter(tx)
-		sisochannel.SetReceiver(rx)
+
+		sisochannel.AddTransmiter(tx)
+		sisochannel.AddReceiver(rx)
 		sisochannel.Start()
 	}
 
@@ -111,11 +118,14 @@ func (s *SinWaveGenerator) StartTransmit() {
 		// log.Println("Tx..", i)
 		s.sch <- chdata
 	}
-	s.wg.Done()
+	if s.wg != nil {
+		s.wg.Done()
+	}
+
 }
 
 func (s SinWaveGenerator) GetID() int {
-	return 0
+	return s.nid
 }
 
 func (s SinWaveGenerator) GetSeed() int64 {
@@ -131,7 +141,7 @@ func (s *SinWaveGenerator) SetWaitGroup(wg *sync.WaitGroup) {
 // Simple rx node
 func (c *CSVReceiver) StartReceive(rxch gocomm.Complex128AChannel) {
 	w, _ := os.Create("output.dat")
-	c.nid = 2
+
 	for i := 0; ; i++ {
 		rdata := <-rxch
 		fmt.Fprintf(w, "\n%d : %#v", i, rdata)
@@ -141,7 +151,10 @@ func (c *CSVReceiver) StartReceive(rxch gocomm.Complex128AChannel) {
 		}
 
 	}
-	c.wg.Done()
+	if c.wg != nil {
+		c.wg.Done()
+	}
+
 }
 
 func (c CSVReceiver) GetID() int {

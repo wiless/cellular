@@ -15,23 +15,67 @@ func init() {
 	log.Println("Initiated cellular.channel")
 }
 
-type SFN struct {
-	links    []cell.LinkMetric
-	chparams [][]core.ChannelParam
-	freqGHz  float64
+type TransmitterBuffer struct {
+	sync.Mutex
+	data vlib.VectorC
 }
 
-func (s *SFN) CreateDefaultPDP() {
+func (t *TransmitterBuffer) Write(v vlib.VectorC) {
+	t.Lock()
+	t.data = v
+	t.Unlock()
+}
+func (t *TransmitterBuffer) Read() vlib.VectorC {
+
+}
+
+type SFN struct {
+	links     []cell.LinkMetric
+	chparams  [][]core.ChannelParam
+	freqGHz   float64
+	txIDs     vlib.VectorI
+	rxIDs     vlib.VectorI
+	rxSamples map[int]vlib.VectorC
+}
+
+func (s *SFN) createDefaultPDP() {
 	s.chparams = make([][]core.ChannelParam, len(s.links))
+	tmprx := make(map[int]bool)
 	for i := 0; i < len(s.chparams); i++ {
 		s.chparams[i] = make([]core.ChannelParam, len(s.links[i].TxNodeIDs))
-		for j, _ := range s.links[i].TxNodeIDs {
+
+		if val, ok := tmprx[s.links[i].RxNodeID]; ok {
+			log.Println("Duplicate Link found for %d !! ", val)
+		} else {
+			tmprx[s.links[i].RxNodeID] = true
+		}
+
+		tmptx := make(map[int]bool)
+		for j, tid := range s.links[i].TxNodeIDs {
 			s.chparams[i][j] = core.DefaultChannel()
 			s.chparams[i][j].PowerInDBm = s.links[i].TxNodesRSRP[j]
+			tmptx[tid] = true
+		}
+		for key, _ := range tmptx {
+			s.txIDs.AppendAtEnd(key)
 		}
 		log.Printf("\n%d @ %f :  %#v", s.links[i].RxNodeID, s.links[i].FreqInGHz, s.chparams[i])
 	}
+
+	for key, _ := range tmprx {
+		s.rxIDs.AppendAtEnd(key)
+	}
+
 	log.Println("Default PDP created for : ", len(s.chparams))
+
+}
+
+func (s *SFN) GetTxNodeIDs() vlib.VectorI {
+	return s.txIDs
+}
+
+func (s *SFN) GetRxNodeIDs() vlib.VectorI {
+	return s.rxIDs
 }
 
 type Channel struct {
@@ -54,30 +98,106 @@ func NewWirelessChannel(links []cell.LinkMetric) *Channel {
 	return result
 }
 
-func (c *Channel) Start() {
+// CheckTransmitters checks if a Transmitter is set for all the txnodeids set through linkmetrics
+func (c *Channel) CheckTransmitters() bool {
+
+	for i := 0; i < len(c.sflinks); i++ {
+		vec := c.sflinks[i].GetTxNodeIDs()
+		for _, val := range vec {
+			_, ok := c.txnodes[val]
+			if !ok {
+				log.Println("No Transmitter set for id ", val)
+
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// CheckTransmitters checks if a Transmitter is set for all the txnodeids set through linkmetrics
+func (c *Channel) CheckReceivers() bool {
+
+	for i := 0; i < len(c.sflinks); i++ {
+		vec := c.sflinks[i].GetRxNodeIDs()
+		for _, val := range vec {
+			_, ok := c.rxnodes[val]
+			if !ok {
+				log.Println("No Receiver set for id ", val)
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// Start triggers all the transmitters and receivers in all the SFN to transmit and receive data
+func (c *Channel) Start(sfids ...int) {
+
+	if len(sfids) == 0 {
+		sfids = vlib.NewSegmentI(0, len(c.sflinks))
+		log.Println("Start all the SFN in the system : ", sfids)
+
+	}
+
+	/// Check if all transmitters are set for each nodes
+	if !c.CheckTransmitters() {
+		log.Panicln("Some transmitters not associated !!")
+	}
+	if !c.CheckReceivers() {
+		log.Panicln("Some receivers not associated !!")
+	}
 
 	var wg sync.WaitGroup
-	var rxch gocomm.Complex128AChannel
+	for _, sfid := range sfids {
 
-	for indx, tx := range c.txnodes {
-		tx.SetWaitGroup(&wg)
-		rxch = tx.GetChannel()
-		wg.Add(1)
-		log.Printf("%d Tx Started... %#v", indx, tx.GetID())
-		go tx.StartTransmit()
+		go func() {
+			/// Should start all for all the SFN
+			log.Println("TxNodes  : ", c.sflinks[sfid].GetTxNodeIDs())
+			log.Println("RxNodes  : ", c.sflinks[sfid].GetRxNodeIDs())
+
+			var rxch gocomm.Complex128AChannel
+
+			txnodeIDs := c.sflinks[sfid].GetTxNodeIDs()
+			rxnodeIDs := c.sflinks[sfid].GetRxNodeIDs()
+			for indx, tid := range txnodeIDs {
+
+				tx, ok := c.txnodes[tid]
+				if !ok {
+					log.Panicln("Surprising !! No Transmitter attached for ", tid)
+				}
+
+				tx.SetWaitGroup(&wg)
+				rxch = tx.GetChannel()
+
+				wg.Add(1)
+				log.Printf("%d Tx Started... %#v", indx, tx.GetID())
+				go tx.StartTransmit()
+
+			}
+
+			for indx, rid := range rxnodeIDs {
+				rx, ok := c.rxnodes[rid]
+				if !ok {
+					log.Panicln("Surprising !! No Receiver attached for ", rid)
+				}
+				// for indx, rx := range c.rxnodes {
+				rx.SetWaitGroup(&wg)
+				wg.Add(1)
+				log.Printf("%d Rx Started... %#v", indx, rx.GetID())
+				go rx.StartReceive(rxch)
+			}
+
+		}()
+		wg.Wait()
+
 	}
 
-	/// Actually DATA to be weighted and combined here before writing into rx channel
-	for indx, rx := range c.rxnodes {
-		rx.SetWaitGroup(&wg)
-		wg.Add(1)
-		log.Printf("%d Rx Started... %#v", indx, rx.GetID())
-		go rx.StartReceive(rxch)
-	}
-	wg.Wait()
 	log.Println("Done")
 }
-func (c *Channel) SetTransmiter(tx cell.Transmitter) {
+
+// AddTransmitter adds the transmitter tx and assoicates with the txnodeid from tx.GetID()
+func (c *Channel) AddTransmiter(tx cell.Transmitter) {
 	if val, ok := c.txnodes[tx.GetID()]; ok {
 		log.Println("Overwriting Node ", tx.GetID(), val)
 	} else {
@@ -86,7 +206,9 @@ func (c *Channel) SetTransmiter(tx cell.Transmitter) {
 	}
 
 }
-func (c *Channel) SetReceiver(rx cell.Receiver) {
+
+// AddReceiver adds the receiver rx and assoicates with the rxnodeid from rx.GetID()
+func (c *Channel) AddReceiver(rx cell.Receiver) {
 	if val, ok := c.rxnodes[rx.GetID()]; ok {
 		log.Println("Overwriting Node ", rx.GetID(), val)
 	} else {
@@ -106,11 +228,13 @@ func (c *Channel) CreateFromFile(file string) {
 /// to be called only when freqindxMap is created
 func (c *Channel) classifySFN(links []cell.LinkMetric) {
 	c.freqindxMap = make(map[float64]vlib.VectorI)
+
 	for i, v := range links {
 		index := c.freqindxMap[v.FreqInGHz]
 		index.AppendAtEnd(i)
 		c.freqindxMap[v.FreqInGHz] = index
 	}
+
 	c.sflinks = make([]SFN, len(c.freqindxMap))
 	c.freqs = vlib.NewVectorF(len(c.freqindxMap))
 	var i int = 0
@@ -121,7 +245,7 @@ func (c *Channel) classifySFN(links []cell.LinkMetric) {
 		for j, v := range ivec {
 			c.sflinks[i].links[j] = links[v]
 		}
-		c.sflinks[i].CreateDefaultPDP()
+		c.sflinks[i].createDefaultPDP()
 		// log.Println("=================== ", f)
 		// log.Println(c.sflinks[i])
 		i++
