@@ -90,19 +90,18 @@ func (s *SinWaveGenerator) StartTransmit() {
 	if s.sch == nil {
 		log.Panicln("SinWaveGenerator Not Intialized !! No channel yet")
 	}
-	log.Println("Reading to send ??")
+	log.Println("Ready to send ??")
 	var chdata gocomm.SComplex128AObj
 	chdata.MaxExpected = s.Nblocks
 	chdata.Message = "BS"
 	chdata.Ts = 1
 	N := 32                   // 32bits=16SYMBOLS per TTI
 	qpsk := modem.NewModem(2) // QPSK Modem
-	log.Println("Reading to send ??")
+	log.Println("Ready to send ??")
 	for i := 0; i < s.Nblocks; i++ {
 		chdata.Next(qpsk.ModulateBits(vlib.RandB(N)))
 		log.Println("Sending Tx..", i, " with   ", len(chdata.Ch), " symbols ")
 		s.sch <- chdata
-
 	}
 	if s.wg != nil {
 		s.wg.Done()
@@ -131,9 +130,10 @@ func (c *CSVReceiver) StartReceive(rxch gocomm.Complex128AChannel) {
 	w, _ := os.Create("output.dat")
 
 	for i := 0; ; i++ {
+		log.Println("Waiting to read data from my input pin ", i)
 		rdata := <-rxch
 		fmt.Fprintf(w, "\n%d : %#v", i, rdata)
-		// log.Println("Rx..", i)
+		log.Println("CSVReceive ..", i)
 		if i == rdata.GetMaxExpected()-1 {
 			break
 		}

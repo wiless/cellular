@@ -59,10 +59,17 @@ type TransmitterBufferManager struct {
 	feedbackTx2Rx chan int
 	feedbackRx2Tx chan int
 }
+
+type Status struct {
+	Total   int
+	counter int
+}
+
 type ReceiverBufferManager struct {
 	rxOutputBuffer map[int]*RecieverBuffer
 	feedbackTx2Rx  chan int
 	feedbackRx2Tx  chan int
+	TxReadyStatus  map[int]*Status
 }
 
 func (r *ReceiverBufferManager) Create(rxid int, totalTxIDs int) {
@@ -103,6 +110,7 @@ func (r *ReceiverBufferManager) GetCh(rid int) gocomm.Complex128AChannel {
 }
 
 func (t *TransmitterBufferManager) Set(tid int, ch gocomm.Complex128AChannel) {
+
 	tb, ok := t.txInputBuffer[tid]
 	if !ok {
 		log.Panicln("TxBufMgr.Set(): Unknown/not-created Txid ", tid)
@@ -151,23 +159,23 @@ func (r *ReceiverBufferManager) Start() {
 }
 
 func (t *TransmitterBufferManager) Start() {
-	// for txid, _ := range t.txInputBuffer {
-	// 	t.feedbackTx2Rx <- txid
-	// }
 	var trigTxID int
 	var ok bool
 	/// send once in sequential and then keep waiting..
+	// var wg sync.WaitGroup
 	for tid, tx := range t.txInputBuffer {
-
-		go func(tid int) {
+		// wg.Add(1)
+		func(tid int) {
 
 			tx.Update()
 			t.feedbackTx2Rx <- tid
-
+			// wg.Done()
 		}(tid)
+
 		// tx.Update()
 		// t.feedbackTx2Rx <- tid
 	}
+	// wg.Wait()
 
 	for {
 		log.Println("TxBuf Mgr: Waiting for some feedback !!")
@@ -213,6 +221,8 @@ func (s *SFN) StartBufferManager() {
 		for _, rxid := range affectedRxids {
 			txobj := s.txMgr.txInputBuffer[txid].ReadObj()
 
+			s.rxMgr.TxReadyStatus[txid].counter++
+
 			func() {
 				rxbufr := s.rxMgr.rxOutputBuffer[rxid]
 				txsamples := txobj.Ch
@@ -237,11 +247,16 @@ func (s *SFN) StartBufferManager() {
 
 					/// Write to Reciever
 					rxbufr.Write(rxobj)
-					s.rxMgr.feedbackRx2Tx <- rxid
-					log.Println("Feedback sent for ", cnt)
 					cnt++
 				}
 			}()
+
+			if s.rxMgr.TxReadyStatus[txid].counter == s.rxMgr.TxReadyStatus[txid].Total {
+				s.rxMgr.feedbackRx2Tx <- txid
+				s.rxMgr.TxReadyStatus[txid].counter = 0
+				log.Println("Block ", cnt, " Feedback sent to transmit ", txid)
+
+			}
 
 		}
 
@@ -285,7 +300,7 @@ func (s *SFN) createDefaultPDP() {
 			s.txPortIDs.AppendAtEnd(key)
 		}
 
-		log.Printf("\n%d @ %f :  %#v", s.links[i].RxNodeID, s.links[i].FreqInGHz, s.chparams[i])
+		//log.Printf("\n%d @ %f :  %#v", s.links[i].RxNodeID, s.links[i].FreqInGHz, s.chparams[i])
 	}
 
 	log.Println("Default PDP created for : ", len(s.chparams))
@@ -372,18 +387,12 @@ func (c *Channel) Start(sfids ...int) {
 			log.Println("RxNodes  : ", rxnodeIDs)
 
 			for _, tid := range txnodeIDs {
-
-				// tx, ok := c.txnodes[tid]
-				// /// Double-check (actually may not be needed)
-				// if !ok || tx == nil {
-				// 	log.Panicln("Surprising !! No Transmitter attached for ", tid)
-				// }
-
 				readCH := c.txnodes[tid].GetChannel()
 				c.sflinks[sfid].txMgr.Set(tid, readCH)
 
 			}
 			log.Println("Setting WG = ", &wg)
+
 			for indx, tx := range c.txnodes {
 				tx.SetWaitGroup(&wg)
 				wg.Add(1)
@@ -403,7 +412,7 @@ func (c *Channel) Start(sfids ...int) {
 				}
 
 				rx.SetWaitGroup(&wg)
-				//	wg.Add(1)
+				wg.Add(1)
 				log.Printf("%d Rx Started... %#v", indx, rid)
 				writeCH := c.sflinks[sfid].rxMgr.GetCh(rid)
 				go rx.StartReceive(writeCH)
@@ -494,21 +503,33 @@ func (c *Channel) Init() {
 		uplinkfb := make(chan int)
 		c.sflinks[i].txMgr.feedbackTx2Rx = downlinkfb
 		c.sflinks[i].txMgr.feedbackRx2Tx = uplinkfb
+
 		c.sflinks[i].rxMgr.feedbackTx2Rx = downlinkfb
 		c.sflinks[i].rxMgr.feedbackRx2Tx = uplinkfb
 
 		c.sflinks[i].rxMgr.rxOutputBuffer = make(map[int]*RecieverBuffer)
 		c.sflinks[i].txMgr.txInputBuffer = make(map[int]*TransmitterBuffer)
+
+		/// Set Status monitor at RxBufMgr
+		c.sflinks[i].rxMgr.TxReadyStatus = make(map[int]*Status)
+
 		/// Create  RxOutputBuffer
 		for _, val := range c.sflinks[i].rxPortIDs {
 			totalTxIDs := c.sflinks[i].associatedTx[val].Size()
 			c.sflinks[i].rxMgr.Create(val, totalTxIDs)
 		}
+
 		/// Create TxInputBuffer and
 		for _, val := range c.sflinks[i].txPortIDs {
 			c.sflinks[i].txMgr.txInputBuffer[val] = new(TransmitterBuffer)
+
+			txstat := new(Status)
+			txstat.Total = c.sflinks[i].associatedRx[val].Size()
+			txstat.counter = 0
+			c.sflinks[i].rxMgr.TxReadyStatus[val] = txstat
+
 		}
-		log.Printf("Buffer Info %#v  %#v", c.sflinks[i].txMgr, c.sflinks[i].rxMgr)
+		// log.Printf("Buffer Info %#v  %#v", c.sflinks[i].txMgr, c.sflinks[i].rxMgr)
 
 	}
 
