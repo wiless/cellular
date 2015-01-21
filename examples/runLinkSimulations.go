@@ -54,7 +54,6 @@ func main() {
 	links[0] = cellular.CreateSimpleLink(csvr.GetID(), swg.GetID(), 10)
 
 	sisochannel := channel.NewWirelessChannel(links)
-	sisochannel.Init()
 
 	swg.Init()
 	{
@@ -66,33 +65,17 @@ func main() {
 
 		sisochannel.AddTransmiter(tx)
 		sisochannel.AddReceiver(rx)
-		sisochannel.Start()
+
 	}
 
-	// sisochannel.SetReceiver(r)
-	// CreateChannelLinks()
+	sisochannel.Init()
+	sisochannel.Start()
+
 	log.Println("Done..")
-	// for i := 0; ; i++ {
-	// 	rdata := <-tx.GetChannel()
-
-	// 	fmt.Println("Rx ", i, " = > ", rdata.Ch)
-	// 	if i == rdata.GetMaxExpected()-1 {
-	// 		log.Println("Finished ", i+1, " blocks")
-	// 		break
-	// 	}
-	// }
-
-	// w, _ := os.Create("dump.txt")
-	// for idx, val := range result {
-	// 	fmt.Fprintf(w, "\n %d :  %#v\n", idx, val)
-	// }
 
 	matlab.Close()
 	fmt.Println("\n")
 }
-
-//  Simple transmit node
-// Example link-level simuation
 
 func (s SinWaveGenerator) GetChannel() gocomm.Complex128AChannel {
 	return s.sch
@@ -103,20 +86,23 @@ func (s *SinWaveGenerator) Init() {
 	s.Nblocks = 10
 }
 func (s *SinWaveGenerator) StartTransmit() {
+	fmt.Println("Current WG = ", s.wg)
 	if s.sch == nil {
 		log.Panicln("SinWaveGenerator Not Intialized !! No channel yet")
 	}
+	log.Println("Reading to send ??")
 	var chdata gocomm.SComplex128AObj
 	chdata.MaxExpected = s.Nblocks
 	chdata.Message = "BS"
 	chdata.Ts = 1
 	N := 32                   // 32bits=16SYMBOLS per TTI
 	qpsk := modem.NewModem(2) // QPSK Modem
-
+	log.Println("Reading to send ??")
 	for i := 0; i < s.Nblocks; i++ {
 		chdata.Next(qpsk.ModulateBits(vlib.RandB(N)))
-		// log.Println("Tx..", i)
+		log.Println("Sending Tx..", i, " with   ", len(chdata.Ch), " symbols ")
 		s.sch <- chdata
+
 	}
 	if s.wg != nil {
 		s.wg.Done()
@@ -135,7 +121,9 @@ func (s SinWaveGenerator) IsActive() bool {
 	return true
 }
 func (s *SinWaveGenerator) SetWaitGroup(wg *sync.WaitGroup) {
+	log.Println("Before WG = ", s.wg)
 	s.wg = wg
+	log.Println("After WG = ", wg)
 }
 
 // Simple rx node
