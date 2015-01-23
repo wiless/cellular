@@ -41,30 +41,37 @@ type CSVReceiver struct {
 
 func main() {
 
-	var swg SinWaveGenerator
+	var sisochannel channel.Channel
+	sisochannel.CreateFromFile("linkmetric2.json")
 
-	var csvr CSVReceiver
-	swg.nid, csvr.nid = 0, 1
+	// links := make([]cellular.LinkMetric, 1)
+	// links[0] = cellular.CreateSimpleLink(csvr.GetID(), swg.GetID(), 10)
+	// sisochannel := channel.NewWirelessChannel(links)
 
-	// var sisochannel channel.Channel
-	// sisochannel.CreateFromFile("linkmetric2.json")
-
-	links := make([]cellular.LinkMetric, 1)
-
-	links[0] = cellular.CreateSimpleLink(csvr.GetID(), swg.GetID(), 10)
-
-	sisochannel := channel.NewWirelessChannel(links)
-
-	swg.Init()
+	// swg.nid, csvr.nid = 0, 1
+	sfid := sisochannel.SFNids()[0]
 	{
-
-		var tx cellular.Transmitter
-		var rx cellular.Receiver
-		tx = &swg
-		rx = &csvr
-
-		sisochannel.AddTransmiter(tx)
-		sisochannel.AddReceiver(rx)
+		txnodesIds := sisochannel.GetTxNodeIDs(sfid)
+		log.Println(txnodesIds)
+		for indx, txid := range txnodesIds {
+			var swg SinWaveGenerator
+			swg.Init()
+			swg.nid = txid
+			var tx cellular.Transmitter
+			tx = &swg
+			sisochannel.AddTransmiter(tx)
+			log.Printf("%d Tx Added %d", indx, txid)
+		}
+		rxnodesIds := sisochannel.GetRxNodeIDs(sfid)
+		log.Println(rxnodesIds)
+		for indx, rxid := range rxnodesIds {
+			var csvr CSVReceiver
+			csvr.nid = rxid
+			var rx cellular.Receiver
+			rx = &csvr
+			sisochannel.AddReceiver(rx)
+			log.Printf("%d Rx Added %d", indx, rxid)
+		}
 
 	}
 
@@ -100,7 +107,7 @@ func (s *SinWaveGenerator) StartTransmit() {
 	log.Println("Ready to send ??")
 	for i := 0; i < s.Nblocks; i++ {
 		chdata.Next(qpsk.ModulateBits(vlib.RandB(N)))
-		log.Println("Sending Tx..", i, " with   ", len(chdata.Ch), " symbols ")
+		log.Printf("%d Sending Tx-%d with %d symbols ", i, s.GetID(), len(chdata.Ch))
 		s.sch <- chdata
 	}
 	if s.wg != nil {
@@ -130,10 +137,10 @@ func (c *CSVReceiver) StartReceive(rxch gocomm.Complex128AChannel) {
 	w, _ := os.Create("output.dat")
 
 	for i := 0; ; i++ {
-		log.Println("Waiting to read data from my input pin ", i)
+		log.Printf("Rx-%d Waiting to read data at Input ", c.GetID())
 		rdata := <-rxch
 		fmt.Fprintf(w, "\n%d : %#v", i, rdata)
-		log.Println("CSVReceive ..", i)
+		log.Println("Recieved CSVReceive block ", i)
 		if i == rdata.GetMaxExpected()-1 {
 			break
 		}

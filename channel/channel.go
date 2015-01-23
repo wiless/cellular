@@ -15,6 +15,40 @@ func init() {
 	log.Println("Initiated cellular.channel")
 }
 
+type BufferState int
+
+var BufferStates = [...]string{
+	"DataReady",
+	"DataSent",
+	"DataACKed",
+}
+
+func (b BufferState) String() string {
+	if int(b) >= len(BufferStates) {
+		log.Printf("Found this %d Bufferstate ", int(b))
+		return "Unknown!!"
+	}
+	return BufferStates[b]
+}
+
+func (b *BufferState) Next() {
+
+	if *b == DataACKed {
+		*b = DataReady
+	}
+
+	tmpval := int(*b) + 1
+	log.Printf("NextState : %d Current : %v", tmpval, b)
+	*b = BufferState(tmpval)
+
+}
+
+const (
+	DataReady BufferState = iota
+	DataSent
+	DataACKed
+)
+
 type Channel struct {
 	sflinks     []SFN
 	freqs       vlib.VectorF
@@ -43,6 +77,7 @@ type TransmitterBuffer struct {
 	sync.Mutex
 	rawdata vlib.VectorC
 	data    gocomm.SComplex128AObj
+	state   BufferState
 }
 
 type RecieverBuffer struct {
@@ -69,7 +104,24 @@ type ReceiverBufferManager struct {
 	rxOutputBuffer map[int]*RecieverBuffer
 	feedbackTx2Rx  chan int
 	feedbackRx2Tx  chan int
-	TxReadyStatus  map[int]*Status
+	sync.Mutex
+	TxReadyStatus map[int]*Status
+}
+
+func (r *ReceiverBufferManager) ShouldACK(txid int) bool {
+	result := r.TxReadyStatus[txid].counter == r.TxReadyStatus[txid].Total
+	if result {
+		r.Lock()
+		r.TxReadyStatus[txid].counter = r.TxReadyStatus[txid].Total
+		r.Unlock()
+	}
+	return result
+}
+
+func (r *ReceiverBufferManager) UpdateCounter(txid int) {
+	r.Lock()
+	r.TxReadyStatus[txid].counter++
+	r.Unlock()
 }
 
 func (r *ReceiverBufferManager) Create(rxid int, totalTxIDs int) {
@@ -82,8 +134,9 @@ func (r *ReceiverBufferManager) Create(rxid int, totalTxIDs int) {
 }
 
 func (r *RecieverBuffer) Write(obj gocomm.SComplex128AObj) {
-	r.source <- obj
 	r.counter = r.TotalTx
+	r.source <- obj
+
 }
 func (r *RecieverBuffer) Accumulate(samples vlib.VectorC) {
 	r.Lock()
@@ -125,6 +178,10 @@ func (t *TransmitterBufferManager) Get(tid int) gocomm.Complex128AChannel {
 
 func (t *TransmitterBuffer) Update() {
 	t.WriteObj(<-t.source)
+	log.Printf("Updating state of buffer Old %d ", t.state)
+	t.state.Next()
+	log.Printf("Updating state of buffer New %d ", t.state)
+
 }
 
 func (t *TransmitterBuffer) WriteObj(obj gocomm.SComplex128AObj) {
@@ -162,23 +219,31 @@ func (t *TransmitterBufferManager) Start() {
 	var trigTxID int
 	var ok bool
 	/// send once in sequential and then keep waiting..
-	// var wg sync.WaitGroup
+	var wg sync.WaitGroup
 	for tid, tx := range t.txInputBuffer {
-		// wg.Add(1)
-		func(tid int) {
 
+		tx.state = DataACKed
+		wg.Add(1)
+		go func(tid int) {
 			tx.Update()
 			t.feedbackTx2Rx <- tid
-			// wg.Done()
+			wg.Done()
 		}(tid)
 
 		// tx.Update()
 		// t.feedbackTx2Rx <- tid
 	}
-	// wg.Wait()
+	wg.Wait()
+
+	result := true
+	for txid, tbr := range t.txInputBuffer {
+		log.Printf("1ST TIME STATUS : Tx : %d : %s ", txid, tbr.state)
+		result = result && tbr.state == DataACKed
+	}
 
 	for {
 		log.Println("TxBuf Mgr: Waiting for some feedback !!")
+
 		trigTxID, ok = <-t.feedbackRx2Tx
 
 		if !ok {
@@ -186,9 +251,19 @@ func (t *TransmitterBufferManager) Start() {
 			return
 		}
 		go func(tid int) {
-
 			t.txInputBuffer[tid].Update()
-			t.feedbackTx2Rx <- tid
+
+			// SEND when state ALL the txBuffer is set to 0 (Data Ready)
+			// Checking if all ready to SEND
+			result := true
+			for txid, tbr := range t.txInputBuffer {
+				log.Printf("Tx : %d : %s ", txid, tbr.state)
+				result = result && tbr.state == DataACKed
+			}
+			if result {
+
+				t.feedbackTx2Rx <- tid
+			}
 
 		}(trigTxID)
 
@@ -206,10 +281,16 @@ func (s *SFN) StartBufferManager() {
 
 	// }
 	cnt := 0
+	for txid, val := range s.associatedRx {
+		log.Printf("Tx %d : %d", txid, val)
+	}
+
 	for {
 		log.Println("RxBuf Mgr: Waiting for some trigger !!")
+
 		txid, ok := <-s.txMgr.feedbackTx2Rx
 
+		log.Println("All receivers are", s.associatedRx[txid])
 		log.Printf("Packet %d : Found feedback from Transmitter %d", cnt, txid)
 
 		affectedRxids, ok := s.associatedRx[txid]
@@ -217,14 +298,13 @@ func (s *SFN) StartBufferManager() {
 			log.Println("Unknown TxID sent  by Txmanager !!")
 			return
 		}
-
-		for _, rxid := range affectedRxids {
-			txobj := s.txMgr.txInputBuffer[txid].ReadObj()
-
-			s.rxMgr.TxReadyStatus[txid].counter++
-
-			func() {
-				rxbufr := s.rxMgr.rxOutputBuffer[rxid]
+		var mgrwg sync.WaitGroup
+		txobj := s.txMgr.txInputBuffer[txid].ReadObj()
+		for index, rxid := range affectedRxids {
+			log.Printf("%d i am goin to process %d from tx %d", index, rxid, txid)
+			mgrwg.Add(1)
+			go func(rid int) {
+				rxbufr := s.rxMgr.rxOutputBuffer[rid]
 				txsamples := txobj.Ch
 				/// Ideally Do convolution
 				// conv and ...
@@ -236,10 +316,12 @@ func (s *SFN) StartBufferManager() {
 				/// Accumulate into rxbuffer
 
 				rxbufr.Accumulate(rxsamples)
-				log.Println("Accumulating samples ")
+				log.Printf("Rx %d is Accumulating samples from %d ", rid, txid)
+				s.rxMgr.UpdateCounter(txid) /// counter++
+
 				if rxbufr.counter == 0 {
 					/// Data ready to be processed by the receiver ,
-					log.Println("Ready to write to rx")
+					log.Println("Ready to write to rx ", rid)
 					var rxobj gocomm.SComplex128AObj
 					/// Change extra params if needed
 					rxobj = txobj
@@ -249,15 +331,17 @@ func (s *SFN) StartBufferManager() {
 					rxbufr.Write(rxobj)
 					cnt++
 				}
-			}()
+				mgrwg.Done()
+			}(rxid)
 
-			if s.rxMgr.TxReadyStatus[txid].counter == s.rxMgr.TxReadyStatus[txid].Total {
-				s.rxMgr.feedbackRx2Tx <- txid
-				s.rxMgr.TxReadyStatus[txid].counter = 0
-				log.Println("Block ", cnt, " Feedback sent to transmit ", txid)
+		}
+		mgrwg.Wait()
 
-			}
-
+		if s.rxMgr.ShouldACK(txid) {
+			log.Printf("Packet %d : Sending ACK for TxID %d ", cnt, txid)
+			// s.rxMgr.Reset(txid)
+			// s.rxMgr.TxReadyStatus[txid].counter = 0
+			s.rxMgr.feedbackRx2Tx <- txid
 		}
 
 	}
@@ -268,7 +352,9 @@ func (s *SFN) createDefaultPDP() {
 	s.chparams = make([][]core.ChannelParam, len(s.links))
 	s.associatedRx = make(map[int]vlib.VectorI)
 	s.associatedTx = make(map[int]vlib.VectorI)
+	s.txPortIDs.Resize(0)
 
+	tmptx := make(map[int]bool)
 	for i := 0; i < len(s.chparams); i++ {
 		rxid := s.links[i].RxNodeID
 
@@ -284,25 +370,21 @@ func (s *SFN) createDefaultPDP() {
 			s.rxPortIDs.AppendAtEnd(rxid)
 		}
 
-		tmptx := make(map[int]bool)
 		for j, tid := range s.links[i].TxNodeIDs {
 			s.chparams[i][j] = core.DefaultChannel()
 			s.chparams[i][j].PowerInDBm = s.links[i].TxNodesRSRP[j]
 			rvec := s.associatedRx[tid]
 			rvec.AppendAtEnd(rxid)
 			s.associatedRx[tid] = rvec
-
 			tmptx[tid] = true
-		}
-
-		/// ensure only once the TxIds are entered
-		for key, _ := range tmptx {
-			s.txPortIDs.AppendAtEnd(key)
 		}
 
 		//log.Printf("\n%d @ %f :  %#v", s.links[i].RxNodeID, s.links[i].FreqInGHz, s.chparams[i])
 	}
-
+	/// ensure only once the TxIds are entered
+	for key, _ := range tmptx {
+		s.txPortIDs.AppendAtEnd(key)
+	}
 	log.Println("Default PDP created for : ", len(s.chparams))
 
 }
@@ -325,6 +407,15 @@ func NewWirelessChannel(links []cell.LinkMetric) *Channel {
 	result := new(Channel)
 	result.classifySFN(links)
 	return result
+}
+
+func (c *Channel) GetTxNodeIDs(sfid int) vlib.VectorI {
+	return c.sflinks[sfid].GetTxNodeIDs()
+}
+
+func (c *Channel) GetRxNodeIDs(sfid int) vlib.VectorI {
+	return c.sflinks[sfid].GetRxNodeIDs()
+
 }
 
 // CheckTransmitters checks if a Transmitter is set for all the txnodeids set through linkmetrics
@@ -429,10 +520,10 @@ func (c *Channel) Start(sfids ...int) {
 // AddTransmitter adds the transmitter tx and assoicates with the txnodeid from tx.GetID()
 func (c *Channel) AddTransmiter(tx cell.Transmitter) {
 	if val, ok := c.txnodes[tx.GetID()]; ok {
-		log.Println("Overwriting Node ", tx.GetID(), val)
+		log.Println("Tx Overwriting Node ", tx.GetID(), val)
 	} else {
 		c.txnodes[tx.GetID()] = tx
-		log.Println("Added Node ", tx.GetID())
+		log.Println("Transmitter Added Node ", tx.GetID())
 	}
 
 }
@@ -440,10 +531,10 @@ func (c *Channel) AddTransmiter(tx cell.Transmitter) {
 // AddReceiver adds the receiver rx and assoicates with the rxnodeid from rx.GetID()
 func (c *Channel) AddReceiver(rx cell.Receiver) {
 	if val, ok := c.rxnodes[rx.GetID()]; ok {
-		log.Println("Overwriting Node ", rx.GetID(), val)
+		log.Println("Rx Overwriting Node ", rx.GetID(), val)
 	} else {
 		c.rxnodes[rx.GetID()] = rx
-		log.Println("Added Node ", rx.GetID())
+		log.Println("Receiver Added Node ", rx.GetID())
 	}
 }
 
@@ -484,6 +575,14 @@ func (c *Channel) classifySFN(links []cell.LinkMetric) {
 	c.rxnodes = make(map[int]cell.Receiver)
 }
 
+func (c *Channel) SFNids() vlib.VectorI {
+	result := vlib.NewVectorI(len(c.sflinks))
+	for key, _ := range c.sflinks {
+		result.AppendAtEnd(key)
+	}
+	return result
+}
+
 func (c *Channel) SFN() int {
 	return c.freqs.Size()
 }
@@ -499,8 +598,8 @@ func (c *Channel) Init() {
 			log.Panicln("All rxports not associcated with Receivers")
 		}
 
-		downlinkfb := make(chan int)
-		uplinkfb := make(chan int)
+		downlinkfb := make(chan int, 10)
+		uplinkfb := make(chan int, 10)
 		c.sflinks[i].txMgr.feedbackTx2Rx = downlinkfb
 		c.sflinks[i].txMgr.feedbackRx2Tx = uplinkfb
 
@@ -524,6 +623,7 @@ func (c *Channel) Init() {
 			c.sflinks[i].txMgr.txInputBuffer[val] = new(TransmitterBuffer)
 
 			txstat := new(Status)
+
 			txstat.Total = c.sflinks[i].associatedRx[val].Size()
 			txstat.counter = 0
 			c.sflinks[i].rxMgr.TxReadyStatus[val] = txstat
