@@ -112,7 +112,7 @@ func (r *ReceiverBufferManager) ShouldACK(txid int) bool {
 func (r *ReceiverBufferManager) UpdateCounter(txid int) {
 	r.Lock()
 	r.TxReadyStatus[txid].counter++
-	log.Printf("RxMgr : %d of %d Receivers of Tx-%d have Processed Data", r.TxReadyStatus[txid].counter, r.TxReadyStatus[txid].Total, txid)
+	//log.Printf("RxMgr : %d of %d Receivers of Tx-%d have Processed Data", r.TxReadyStatus[txid].counter, r.TxReadyStatus[txid].Total, txid)
 	r.Unlock()
 }
 
@@ -249,9 +249,9 @@ func (t *TransmitterBufferManager) Start() {
 				for txid, txbfr := range t.txInputBuffer {
 					wg.Add(1)
 					go func(tid int, bfr *TransmitterBuffer) {
-						log.Printf("TxMgr : %d : Packet-%d : BROADCASTING ? OldState %v", tid, bfr.counter-1, bfr.state)
+						// log.Printf("TxMgr : %d : Packet-%d : BROADCASTING ? OldState %v", tid, bfr.counter-1, bfr.state)
 						bfr.SetState(DataSent)
-						log.Printf("TxMgr : %d : Packet-%d : BROADCASTING ? NewState %v", tid, bfr.counter-1, bfr.state)
+						// log.Printf("TxMgr : %d : Packet-%d : BROADCASTING ? NewState %v", tid, bfr.counter-1, bfr.state)
 						t.feedbackTx2Rx <- tid
 						wg.Done()
 					}(txid, txbfr)
@@ -279,9 +279,9 @@ func (t *TransmitterBufferManager) Start() {
 
 		wg.Add(1)
 		go func(tid int) {
-			log.Printf("TxMgr: Refilling Data for Txid %d, Status %v,Packet ID %d", tid, t.txInputBuffer[tid].state, t.txInputBuffer[tid].counter-1)
+			// log.Printf("TxMgr: Refilling Data for Txid %d, Status %v,Packet ID %d", tid, t.txInputBuffer[tid].state, t.txInputBuffer[tid].counter-1)
 			t.txInputBuffer[tid].Update()
-			log.Printf("TxMgr: After Refilling Data for Txid %d, Status %v,Packet ID %d", tid, t.txInputBuffer[tid].state, t.txInputBuffer[tid].counter-1)
+			// log.Printf("TxMgr: After Refilling Data for Txid %d, Status %v,Packet ID %d", tid, t.txInputBuffer[tid].state, t.txInputBuffer[tid].counter-1)
 
 			wg.Done()
 		}(trigTxID)
@@ -341,7 +341,7 @@ func (s *SFN) StartBufferManager() {
 
 		txobj := s.txMgr.txInputBuffer[txid].ReadObj()
 		for _, rxid := range affectedRxids {
-			log.Printf("RxMgr : Rx-%d Processing Packet %d  from %d", rxid, s.txMgr.txInputBuffer[txid].counter, txid)
+			// log.Printf("RxMgr : Rx-%d Processing Packet %d  from %d", rxid, s.txMgr.txInputBuffer[txid].counter, txid)
 			mgrwg.Add(1)
 			go func(rid int) {
 				rxbufr := s.rxMgr.rxOutputBuffer[rid]
@@ -356,11 +356,11 @@ func (s *SFN) StartBufferManager() {
 				/// Accumulate into rxbuffer
 
 				rxbufr.Accumulate(rxsamples)
-				log.Printf("RxMgr Rx-%d is Accumulating samples from %d ", rid, txid)
+				// log.Printf("RxMgr Rx-%d is Accumulating samples from %d ", rid, txid)
 
 				if rxbufr.counter == 0 {
 					/// Data ready to be processed by the receiver ,
-					log.Printf("RxMgr Rx-%d SENT ", rid)
+					// log.Printf("RxMgr Rx-%d SENT ", rid)
 					var rxobj gocomm.SComplex128AObj
 					/// Change extra params if needed
 					rxobj = txobj
@@ -370,7 +370,7 @@ func (s *SFN) StartBufferManager() {
 					/// Write to Reciever
 					rxbufr.Write(rxobj)
 				} else {
-					log.Printf("RxMgr Rx-%d Cant transmit data YET for Tx related to %d", rid, txid)
+					// log.Printf("RxMgr Rx-%d Cant transmit data YET for Tx related to %d", rid, txid)
 
 				}
 				s.rxMgr.UpdateCounter(txid) /// counter++
