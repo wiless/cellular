@@ -40,7 +40,7 @@ type CSVReceiver struct {
 }
 
 func main() {
-
+	starttime := time.Now()
 	var sisochannel channel.Channel
 	sisochannel.CreateFromFile("linkmetric2.json")
 
@@ -81,7 +81,7 @@ func main() {
 	log.Println("Done..")
 
 	matlab.Close()
-	fmt.Println("\n")
+	log.Println("Time Elapsed ", time.Since(starttime))
 }
 
 func (s SinWaveGenerator) GetChannel() gocomm.Complex128AChannel {
@@ -138,7 +138,7 @@ func (c *CSVReceiver) StartReceive(rxch gocomm.Complex128AChannel) {
 		// log.Printf("CSFReceiver: Rx-%d Waiting to read data at Input ", c.GetID())
 		rdata := <-rxch
 		fmt.Fprintf(w, "\n%d : %#v", i, rdata)
-		log.Println("CSFReceiver: Received Packets  ", i)
+		log.Println("CSFReceiver: Received Packet ID  ", i)
 		if i == rdata.GetMaxExpected()-1 {
 			break
 		}

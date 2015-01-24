@@ -340,8 +340,8 @@ func (s *SFN) StartBufferManager() {
 		}
 
 		txobj := s.txMgr.txInputBuffer[txid].ReadObj()
-		for index, rxid := range affectedRxids {
-			log.Printf("RxMgr : %d i am going to process %d from tx %d", index, rxid, txid)
+		for _, rxid := range affectedRxids {
+			log.Printf("RxMgr : Rx-%d Processing Packet %d  from %d", rxid, s.txMgr.txInputBuffer[txid].counter, txid)
 			mgrwg.Add(1)
 			go func(rid int) {
 				rxbufr := s.rxMgr.rxOutputBuffer[rid]
@@ -382,7 +382,7 @@ func (s *SFN) StartBufferManager() {
 		mgrwg.Wait()
 
 		if s.rxMgr.ShouldACK(txid) {
-			log.Printf("RxMgr Sending ACK for TxID %d (Packet %d)", txid, cnt)
+			log.Printf("RxMgr Sending ACK for TxID %d (Total Transmissions %d)", txid, cnt)
 			// s.rxMgr.Reset(txid)
 			// s.rxMgr.TxReadyStatus[txid].counter = 0
 			s.rxMgr.feedbackRx2Tx <- txid
