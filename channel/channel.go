@@ -31,18 +31,6 @@ func (b BufferState) String() string {
 	return BufferStates[b]
 }
 
-func (b *BufferState) Next() {
-
-	if *b == DataACKed {
-		*b = DataReady
-	}
-
-	tmpval := int(*b) + 1
-	log.Printf("NextState : %d Current : %v", tmpval, b)
-	*b = BufferState(tmpval)
-
-}
-
 const (
 	DataReady BufferState = iota
 	DataSent
@@ -73,20 +61,23 @@ type SFN struct {
 }
 
 type TransmitterBuffer struct {
+	id int
+
 	source gocomm.Complex128AChannel
 	sync.Mutex
+	counter int
 	rawdata vlib.VectorC
 	data    gocomm.SComplex128AObj
 	state   BufferState
 }
 
 type RecieverBuffer struct {
-	sync.Mutex
 	source gocomm.Complex128AChannel
 
+	sync.Mutex
+	counter int
 	data    vlib.VectorC
 	TotalTx int
-	counter int
 }
 
 type TransmitterBufferManager struct {
@@ -112,7 +103,7 @@ func (r *ReceiverBufferManager) ShouldACK(txid int) bool {
 	result := r.TxReadyStatus[txid].counter == r.TxReadyStatus[txid].Total
 	if result {
 		r.Lock()
-		r.TxReadyStatus[txid].counter = r.TxReadyStatus[txid].Total
+		r.TxReadyStatus[txid].counter = 0
 		r.Unlock()
 	}
 	return result
@@ -121,6 +112,7 @@ func (r *ReceiverBufferManager) ShouldACK(txid int) bool {
 func (r *ReceiverBufferManager) UpdateCounter(txid int) {
 	r.Lock()
 	r.TxReadyStatus[txid].counter++
+	log.Printf("RxMgr : %d of %d Receivers of Tx-%d have Processed Data", r.TxReadyStatus[txid].counter, r.TxReadyStatus[txid].Total, txid)
 	r.Unlock()
 }
 
@@ -176,11 +168,14 @@ func (t *TransmitterBufferManager) Get(tid int) gocomm.Complex128AChannel {
 	return t.txInputBuffer[tid].source
 }
 
+func (t *TransmitterBuffer) SetState(bf BufferState) {
+	t.Lock()
+	t.state = bf
+	t.Unlock()
+}
+
 func (t *TransmitterBuffer) Update() {
 	t.WriteObj(<-t.source)
-	log.Printf("Updating state of buffer Old %d ", t.state)
-	t.state.Next()
-	log.Printf("Updating state of buffer New %d ", t.state)
 
 }
 
@@ -188,6 +183,8 @@ func (t *TransmitterBuffer) WriteObj(obj gocomm.SComplex128AObj) {
 	t.Lock()
 	t.data = obj
 	t.rawdata = obj.Ch
+	t.state = DataReady
+	t.counter++
 	t.Unlock()
 }
 
@@ -215,17 +212,28 @@ func (r *ReceiverBufferManager) Start() {
 	/// Infinite for loop
 }
 
+func (t *TransmitterBufferManager) ReadyForNextSlot() bool {
+	result := true
+	for _, tbr := range t.txInputBuffer {
+		// log.Printf("Tx : %d : %s ", txid, tbr.state)
+		result = result && (tbr.state == DataACKed || tbr.state == DataReady)
+
+	}
+	return result
+
+}
+
 func (t *TransmitterBufferManager) Start() {
 	var trigTxID int
 	var ok bool
 	/// send once in sequential and then keep waiting..
 	var wg sync.WaitGroup
 	for tid, tx := range t.txInputBuffer {
-
-		tx.state = DataACKed
 		wg.Add(1)
 		go func(tid int) {
 			tx.Update()
+			tx.SetState(DataSent)
+			log.Printf("TxMgr: Reading port of txid =%d , State:%v , Packet-ID (%d) and Broadcast ", tid, tx.state, tx.counter-1)
 			t.feedbackTx2Rx <- tid
 			wg.Done()
 		}(tid)
@@ -235,73 +243,105 @@ func (t *TransmitterBufferManager) Start() {
 	}
 	wg.Wait()
 
-	result := true
-	for txid, tbr := range t.txInputBuffer {
-		log.Printf("1ST TIME STATUS : Tx : %d : %s ", txid, tbr.state)
-		result = result && tbr.state == DataACKed
-	}
+	go func() {
+		for {
+			if t.ReadyForNextSlot() {
+				for txid, txbfr := range t.txInputBuffer {
+					wg.Add(1)
+					go func(tid int, bfr *TransmitterBuffer) {
+						log.Printf("TxMgr : %d : Packet-%d : BROADCASTING ? OldState %v", tid, bfr.counter-1, bfr.state)
+						bfr.SetState(DataSent)
+						log.Printf("TxMgr : %d : Packet-%d : BROADCASTING ? NewState %v", tid, bfr.counter-1, bfr.state)
+						t.feedbackTx2Rx <- tid
+						wg.Done()
+					}(txid, txbfr)
+
+				}
+				wg.Wait()
+
+			}
+
+		}
+	}()
 
 	for {
 		log.Println("TxBuf Mgr: Waiting for some feedback !!")
 
 		trigTxID, ok = <-t.feedbackRx2Tx
+		t.txInputBuffer[trigTxID].SetState(DataACKed)
+		log.Printf("TxMgr: Received ACK from %d Packet ID=%d, NewState:%v", trigTxID, t.txInputBuffer[trigTxID].counter-1, t.txInputBuffer[trigTxID].state)
 
+		// Fetch New Data
 		if !ok {
 			log.Println("Unknown TxID requested by Rxmanager !!")
 			return
 		}
+
+		wg.Add(1)
 		go func(tid int) {
+			log.Printf("TxMgr: Refilling Data for Txid %d, Status %v,Packet ID %d", tid, t.txInputBuffer[tid].state, t.txInputBuffer[tid].counter-1)
 			t.txInputBuffer[tid].Update()
+			log.Printf("TxMgr: After Refilling Data for Txid %d, Status %v,Packet ID %d", tid, t.txInputBuffer[tid].state, t.txInputBuffer[tid].counter-1)
 
-			// SEND when state ALL the txBuffer is set to 0 (Data Ready)
-			// Checking if all ready to SEND
-			result := true
-			for txid, tbr := range t.txInputBuffer {
-				log.Printf("Tx : %d : %s ", txid, tbr.state)
-				result = result && tbr.state == DataACKed
-			}
-			if result {
-
-				t.feedbackTx2Rx <- tid
-			}
-
+			wg.Done()
 		}(trigTxID)
-
+		wg.Wait()
 	}
+
+	// SEND when state ALL the txBuffer is set to 0 (Data Ready)
+	// Checking if all ready to SEND
+	// log.Println("====Checking if all ready to SEND")
+	// for txid, tbr := range t.txInputBuffer {
+	// 	// log.Printf("Tx : %d : %s ", txid, tbr.state)
+	// 	result = result && tbr.state == DataACKed
+	// 	log.Printf("Tx : %d : %s : BROADCAST ?%v", txid, tbr.state, result)
+	// }
+
+	// if result {
+	// 	for txid, tbr := range t.txInputBuffer {
+
+	// 		go func(tid int) {
+	// 			tbr.Lock()
+	// 			tbr.state = DataSent
+	// 			tbr.Unlock()
+	// 			log.Println("TxMGR ..sending broadcast for ", tid, " State is ", t.txInputBuffer[tid].state)
+	// 			t.feedbackTx2Rx <- tid
+	// 		}(txid)
+	// 	}
+
+	// }
+
 }
 
 func (s *SFN) StartBufferManager() {
 
-	log.Println("Starting TxBufferManager...")
+	// log.Println("Starting TxBufferManager...")
 	go s.txMgr.Start()
 
-	log.Println("Starting RxBufferManager...")
+	// log.Println("Starting RxBufferManager...")
 	// s.rxMgr.feedbackRx2Tx
 	// go func(){
 
 	// }
 	cnt := 0
-	for txid, val := range s.associatedRx {
-		log.Printf("Tx %d : %d", txid, val)
-	}
-
+	// for txid, val := range s.associatedRx {
+	// 	log.Printf("TxMgr: %d : %d", txid, val)
+	// }
+	var mgrwg sync.WaitGroup
 	for {
-		log.Println("RxBuf Mgr: Waiting for some trigger !!")
-
+		log.Println("RxMgr: Listening .. ")
 		txid, ok := <-s.txMgr.feedbackTx2Rx
-
-		log.Println("All receivers are", s.associatedRx[txid])
-		log.Printf("Packet %d : Found feedback from Transmitter %d", cnt, txid)
+		log.Printf("RxMgr: Packet %d : Found Broadcast of Transmitter %d", cnt, txid)
 
 		affectedRxids, ok := s.associatedRx[txid]
 		if !ok {
-			log.Println("Unknown TxID sent  by Txmanager !!")
+			log.Println("RxMgr : Unknown **** TxID sent  by Txmanager *****")
 			return
 		}
-		var mgrwg sync.WaitGroup
+
 		txobj := s.txMgr.txInputBuffer[txid].ReadObj()
 		for index, rxid := range affectedRxids {
-			log.Printf("%d i am goin to process %d from tx %d", index, rxid, txid)
+			log.Printf("RxMgr : %d i am going to process %d from tx %d", index, rxid, txid)
 			mgrwg.Add(1)
 			go func(rid int) {
 				rxbufr := s.rxMgr.rxOutputBuffer[rid]
@@ -316,21 +356,25 @@ func (s *SFN) StartBufferManager() {
 				/// Accumulate into rxbuffer
 
 				rxbufr.Accumulate(rxsamples)
-				log.Printf("Rx %d is Accumulating samples from %d ", rid, txid)
-				s.rxMgr.UpdateCounter(txid) /// counter++
+				log.Printf("RxMgr Rx-%d is Accumulating samples from %d ", rid, txid)
 
 				if rxbufr.counter == 0 {
 					/// Data ready to be processed by the receiver ,
-					log.Println("Ready to write to rx ", rid)
+					log.Printf("RxMgr Rx-%d SENT ", rid)
 					var rxobj gocomm.SComplex128AObj
 					/// Change extra params if needed
 					rxobj = txobj
 					rxobj.Ch = rxsamples
+					cnt++
 
 					/// Write to Reciever
 					rxbufr.Write(rxobj)
-					cnt++
+				} else {
+					log.Printf("RxMgr Rx-%d Cant transmit data YET for Tx related to %d", rid, txid)
+
 				}
+				s.rxMgr.UpdateCounter(txid) /// counter++
+
 				mgrwg.Done()
 			}(rxid)
 
@@ -338,7 +382,7 @@ func (s *SFN) StartBufferManager() {
 		mgrwg.Wait()
 
 		if s.rxMgr.ShouldACK(txid) {
-			log.Printf("Packet %d : Sending ACK for TxID %d ", cnt, txid)
+			log.Printf("RxMgr Sending ACK for TxID %d (Packet %d)", txid, cnt)
 			// s.rxMgr.Reset(txid)
 			// s.rxMgr.TxReadyStatus[txid].counter = 0
 			s.rxMgr.feedbackRx2Tx <- txid
@@ -523,7 +567,7 @@ func (c *Channel) AddTransmiter(tx cell.Transmitter) {
 		log.Println("Tx Overwriting Node ", tx.GetID(), val)
 	} else {
 		c.txnodes[tx.GetID()] = tx
-		log.Println("Transmitter Added Node ", tx.GetID())
+		// log.Println("Transmitter Added Node ", tx.GetID())
 	}
 
 }
@@ -534,7 +578,7 @@ func (c *Channel) AddReceiver(rx cell.Receiver) {
 		log.Println("Rx Overwriting Node ", rx.GetID(), val)
 	} else {
 		c.rxnodes[rx.GetID()] = rx
-		log.Println("Receiver Added Node ", rx.GetID())
+		// log.Println("Receiver Added Node ", rx.GetID())
 	}
 }
 
@@ -621,7 +665,7 @@ func (c *Channel) Init() {
 		/// Create TxInputBuffer and
 		for _, val := range c.sflinks[i].txPortIDs {
 			c.sflinks[i].txMgr.txInputBuffer[val] = new(TransmitterBuffer)
-
+			c.sflinks[i].txMgr.txInputBuffer[val].id = val
 			txstat := new(Status)
 
 			txstat.Total = c.sflinks[i].associatedRx[val].Size()

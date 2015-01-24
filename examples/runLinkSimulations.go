@@ -53,24 +53,24 @@ func main() {
 	{
 		txnodesIds := sisochannel.GetTxNodeIDs(sfid)
 		log.Println(txnodesIds)
-		for indx, txid := range txnodesIds {
+		for _, txid := range txnodesIds {
 			var swg SinWaveGenerator
 			swg.Init()
 			swg.nid = txid
 			var tx cellular.Transmitter
 			tx = &swg
 			sisochannel.AddTransmiter(tx)
-			log.Printf("%d Tx Added %d", indx, txid)
+			// log.Printf("%d Tx Added %d", indx, txid)
 		}
 		rxnodesIds := sisochannel.GetRxNodeIDs(sfid)
 		log.Println(rxnodesIds)
-		for indx, rxid := range rxnodesIds {
+		for _, rxid := range rxnodesIds {
 			var csvr CSVReceiver
 			csvr.nid = rxid
 			var rx cellular.Receiver
 			rx = &csvr
 			sisochannel.AddReceiver(rx)
-			log.Printf("%d Rx Added %d", indx, rxid)
+			// log.Printf("%d Rx Added %d", indx, rxid)
 		}
 
 	}
@@ -90,24 +90,24 @@ func (s SinWaveGenerator) GetChannel() gocomm.Complex128AChannel {
 
 func (s *SinWaveGenerator) Init() {
 	s.sch = gocomm.NewComplex128AChannel()
-	s.Nblocks = 10
+	s.Nblocks = 20
 }
 func (s *SinWaveGenerator) StartTransmit() {
-	fmt.Println("Current WG = ", s.wg)
+
 	if s.sch == nil {
 		log.Panicln("SinWaveGenerator Not Intialized !! No channel yet")
 	}
-	log.Println("Ready to send ??")
+	// log.Println("Ready to send ??")
 	var chdata gocomm.SComplex128AObj
 	chdata.MaxExpected = s.Nblocks
 	chdata.Message = "BS"
 	chdata.Ts = 1
 	N := 32                   // 32bits=16SYMBOLS per TTI
 	qpsk := modem.NewModem(2) // QPSK Modem
-	log.Println("Ready to send ??")
+	// log.Println("SineWaveGen: Ready to send ??")
 	for i := 0; i < s.Nblocks; i++ {
 		chdata.Next(qpsk.ModulateBits(vlib.RandB(N)))
-		log.Printf("%d Sending Tx-%d with %d symbols ", i, s.GetID(), len(chdata.Ch))
+		log.Printf("SineWaveGen: Block-%d Writing into Go-chan Tx-%d with %d symbols ", i, s.GetID(), len(chdata.Ch))
 		s.sch <- chdata
 	}
 	if s.wg != nil {
@@ -127,9 +127,7 @@ func (s SinWaveGenerator) IsActive() bool {
 	return true
 }
 func (s *SinWaveGenerator) SetWaitGroup(wg *sync.WaitGroup) {
-	log.Println("Before WG = ", s.wg)
 	s.wg = wg
-	log.Println("After WG = ", wg)
 }
 
 // Simple rx node
@@ -137,10 +135,10 @@ func (c *CSVReceiver) StartReceive(rxch gocomm.Complex128AChannel) {
 	w, _ := os.Create("output.dat")
 
 	for i := 0; ; i++ {
-		log.Printf("Rx-%d Waiting to read data at Input ", c.GetID())
+		// log.Printf("CSFReceiver: Rx-%d Waiting to read data at Input ", c.GetID())
 		rdata := <-rxch
 		fmt.Fprintf(w, "\n%d : %#v", i, rdata)
-		log.Println("Recieved CSVReceive block ", i)
+		log.Println("CSFReceiver: Received Packets  ", i)
 		if i == rdata.GetMaxExpected()-1 {
 			break
 		}
