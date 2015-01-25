@@ -53,13 +53,13 @@ func main() {
 	// swg.nid, csvr.nid = 0, 1
 	// sink.CRO(scale, NextSize, InCH)
 	cmplxCH := gocomm.NewComplex128AChannel()
-	go sink.CROcomplexA(cmplxCH)
+	go sink.CROcomplexAScatter(cmplxCH)
 	var data gocomm.SComplex128AObj
 	data.MaxExpected = 10
 	for i := 0; i < data.GetMaxExpected(); i++ {
-		data.Ch = vlib.RandUCVec(128, 1)
-
+		data.Ch = vlib.RandUCVec(256, 1)
 		cmplxCH <- data
+		time.Sleep(200 * time.Millisecond)
 	}
 	return
 	var myprobe sink.TwoPinProbe
