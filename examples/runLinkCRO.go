@@ -53,7 +53,7 @@ func main() {
 	// swg.nid, csvr.nid = 0, 1
 	// sink.CRO(scale, NextSize, InCH)
 	cmplxCH := gocomm.NewComplex128AChannel()
-	go sink.CROcomplexA(cmplxCH)
+	go sink.CROcomplexAScatter(cmplxCH)
 	var data gocomm.SComplex128AObj
 	data.MaxExpected = 10
 	for i := 0; i < data.GetMaxExpected(); i++ {
