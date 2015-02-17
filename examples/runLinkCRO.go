@@ -2,17 +2,20 @@ package main
 
 import (
 	"fmt"
-	"github.com/wiless/cellular"
-	"github.com/wiless/cellular/channel"
-	"github.com/wiless/gocomm"
-	"github.com/wiless/gocomm/modem"
-	"github.com/wiless/gocomm/sink"
-	"github.com/wiless/vlib"
-
+	// "github.com/istdev/fadingChan"
 	"log"
 	"math/rand"
 	"os"
 	"sync"
+
+	"github.com/istdev/fadingModels/smallscalechan"
+	"github.com/wiless/cellular"
+	"github.com/wiless/cellular/channel"
+	"github.com/wiless/gocomm"
+	"github.com/wiless/gocomm/chipset"
+	"github.com/wiless/gocomm/modem"
+	"github.com/wiless/gocomm/sink"
+	"github.com/wiless/vlib"
 	// "os"
 
 	"time"
@@ -55,11 +58,40 @@ func main() {
 	cmplxCH := gocomm.NewComplex128AChannel()
 	go sink.CROcomplexAScatter(cmplxCH)
 	var data gocomm.SComplex128AObj
-	data.MaxExpected = 10
-	for i := 0; i < data.GetMaxExpected(); i++ {
-		data.Ch = vlib.RandUCVec(128, 1)
+	data.MaxExpected = 100
 
-		cmplxCH <- data
+	qpsk := modem.NewModem(2)
+	awgnparam := smallscalechan.NewIIDChannel()
+	var iidchannel smallscalechan.MPChannel
+	iidchannel.InitParam(awgnparam)
+	iidchannel.InitializeChip()
+
+	SerialCH := gocomm.NewComplex128Channel()
+	go gocomm.ComplexA2Complex(cmplxCH, SerialCH)
+	go iidchannel.ChannelBlockFn(SerialCH)
+
+	go func() {
+		for i := 0; i < data.GetMaxExpected(); i++ {
+			bits := vlib.RandB(128)
+			// data.Ch = vlib.AddC(qpsk.ModulateBits(bits), vlib.RandNCVec(64, .01))
+			data.Ch = qpsk.ModulateBits(bits) //, vlib.RandNCVec(64, .01))
+			cmplxCH <- data
+			fmt.Printf("\r Written data : %v ", i, bits[0:10])
+			time.Sleep(200 * time.Millisecond)
+		}
+
+	}()
+	choutput := chipset.ToComplexCH(iidchannel.PinByName("outputPin0"))
+
+	for i := 0; ; i++ {
+		output := <-choutput
+		fmt.Print
+		qpsk.DeModulateBlock(OutBlockSize, InCH, outCH)
+		// fmt.Printf("\n Output %v ", output.Ch[0:10])
+		if i == (output.GetMaxExpected() - 1) {
+
+			break
+		}
 	}
 	return
 	var myprobe sink.TwoPinProbe

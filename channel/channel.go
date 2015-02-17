@@ -175,8 +175,9 @@ func (t *TransmitterBuffer) SetState(bf BufferState) {
 }
 
 func (t *TransmitterBuffer) Update() {
-	t.WriteObj(<-t.source)
-
+	tmp := <-t.source
+	log.Println("Txbuffer Update() : ", tmp.Message, " time = ", tmp.TimeStamp)
+	t.WriteObj(tmp)
 }
 
 func (t *TransmitterBuffer) WriteObj(obj gocomm.SComplex128AObj) {
@@ -230,19 +231,21 @@ func (t *TransmitterBufferManager) Start() {
 	var wg sync.WaitGroup
 	for tid, tx := range t.txInputBuffer {
 		wg.Add(1)
-		go func(tid int) {
-			tx.Update()
-			tx.SetState(DataSent)
-			log.Printf("TxMgr: Reading port of txid =%d , State:%v , Packet-ID (%d) and Broadcast ", tid, tx.state, tx.counter-1)
-			t.feedbackTx2Rx <- tid
+
+		go func(tidx int, txb *TransmitterBuffer) {
+			txb.Update()
+			txb.SetState(DataSent)
+			log.Printf("TxMgr - ONETIME : Fetching txid %d (%d), State:%v , Packet : %f  Message=%s ", tidx, txb.id, txb.state, txb.data.TimeStamp, txb.data.Message)
+			t.feedbackTx2Rx <- tidx
 			wg.Done()
-		}(tid)
+		}(tid, tx)
 
 		// tx.Update()
 		// t.feedbackTx2Rx <- tid
 	}
 	wg.Wait()
-
+	///
+	log.Println("Atleast one packet has been sent")
 	go func() {
 		for {
 			if t.ReadyForNextSlot() {
@@ -315,9 +318,6 @@ func (t *TransmitterBufferManager) Start() {
 
 func (s *SFN) StartBufferManager() {
 
-	// log.Println("Starting TxBufferManager...")
-	go s.txMgr.Start()
-
 	// log.Println("Starting RxBufferManager...")
 	// s.rxMgr.feedbackRx2Tx
 	// go func(){
@@ -328,67 +328,74 @@ func (s *SFN) StartBufferManager() {
 	// 	log.Printf("TxMgr: %d : %d", txid, val)
 	// }
 	var mgrwg sync.WaitGroup
-	for {
-		log.Println("RxMgr: Listening .. ")
-		txid, ok := <-s.txMgr.feedbackTx2Rx
-		log.Printf("RxMgr: Packet %d : Found Broadcast of Transmitter %d", cnt, txid)
+	go func() {
+		for {
+			log.Println("RxMgr: Listening .. ")
+			txid, ok := <-s.txMgr.feedbackTx2Rx
+			log.Printf("RxMgr: Counter %d : Found Broadcast of Transmitter %d", cnt, txid)
 
-		affectedRxids, ok := s.associatedRx[txid]
-		if !ok {
-			log.Println("RxMgr : Unknown **** TxID sent  by Txmanager *****")
-			return
+			affectedRxids, ok := s.associatedRx[txid]
+			if !ok {
+				log.Println("RxMgr : Unknown **** TxID sent  by Txmanager *****")
+				return
+			}
+
+			txobj := s.txMgr.txInputBuffer[txid].ReadObj()
+			log.Printf("RxMgr: Packets from Tx : %d = Timestamp : %f ", txid, txobj.TimeStamp)
+
+			for _, rxid := range affectedRxids {
+				// log.Printf("RxMgr : Rx-%d Processing Packet %d  from %d", rxid, s.txMgr.txInputBuffer[txid].counter, txid)
+				mgrwg.Add(1)
+				go func(rid int) {
+					rxbufr := s.rxMgr.rxOutputBuffer[rid]
+					txsamples := txobj.Ch
+					/// Ideally Do convolution
+					// conv and ...
+					//
+					//
+					///
+					rxsamples := txsamples
+
+					/// Accumulate into rxbuffer
+
+					rxbufr.Accumulate(rxsamples)
+					// log.Printf("RxMgr Rx-%d is Accumulating samples from %d ", rid, txid)
+
+					if rxbufr.counter == 0 {
+						/// Data ready to be processed by the receiver ,
+						// log.Printf("RxMgr Rx-%d SENT ", rid)
+						var rxobj gocomm.SComplex128AObj
+						/// Change extra params if needed
+						rxobj = txobj
+						rxobj.Ch = rxsamples
+						cnt++
+
+						/// Write to Reciever
+						rxbufr.Write(rxobj)
+					} else {
+						// log.Printf("RxMgr Rx-%d Cant transmit data YET for Tx related to %d", rid, txid)
+
+					}
+					s.rxMgr.UpdateCounter(txid) /// counter++
+
+					mgrwg.Done()
+				}(rxid)
+
+			}
+			mgrwg.Wait()
+
+			if s.rxMgr.ShouldACK(txid) {
+				log.Printf("RxMgr Sending ACK for TxID %d (Total Transmissions %d)", txid, cnt)
+				// s.rxMgr.Reset(txid)
+				// s.rxMgr.TxReadyStatus[txid].counter = 0
+				s.rxMgr.feedbackRx2Tx <- txid
+			}
+
 		}
+	}()
+	// log.Println("Starting TxBufferManager...")
+	s.txMgr.Start()
 
-		txobj := s.txMgr.txInputBuffer[txid].ReadObj()
-		for _, rxid := range affectedRxids {
-			// log.Printf("RxMgr : Rx-%d Processing Packet %d  from %d", rxid, s.txMgr.txInputBuffer[txid].counter, txid)
-			mgrwg.Add(1)
-			go func(rid int) {
-				rxbufr := s.rxMgr.rxOutputBuffer[rid]
-				txsamples := txobj.Ch
-				/// Ideally Do convolution
-				// conv and ...
-				//
-				//
-				///
-				rxsamples := txsamples
-
-				/// Accumulate into rxbuffer
-
-				rxbufr.Accumulate(rxsamples)
-				// log.Printf("RxMgr Rx-%d is Accumulating samples from %d ", rid, txid)
-
-				if rxbufr.counter == 0 {
-					/// Data ready to be processed by the receiver ,
-					// log.Printf("RxMgr Rx-%d SENT ", rid)
-					var rxobj gocomm.SComplex128AObj
-					/// Change extra params if needed
-					rxobj = txobj
-					rxobj.Ch = rxsamples
-					cnt++
-
-					/// Write to Reciever
-					rxbufr.Write(rxobj)
-				} else {
-					// log.Printf("RxMgr Rx-%d Cant transmit data YET for Tx related to %d", rid, txid)
-
-				}
-				s.rxMgr.UpdateCounter(txid) /// counter++
-
-				mgrwg.Done()
-			}(rxid)
-
-		}
-		mgrwg.Wait()
-
-		if s.rxMgr.ShouldACK(txid) {
-			log.Printf("RxMgr Sending ACK for TxID %d (Total Transmissions %d)", txid, cnt)
-			// s.rxMgr.Reset(txid)
-			// s.rxMgr.TxReadyStatus[txid].counter = 0
-			s.rxMgr.feedbackRx2Tx <- txid
-		}
-
-	}
 	log.Println("Exiting.. buffer manager ")
 }
 
@@ -403,7 +410,7 @@ func (s *SFN) createDefaultPDP() {
 		rxid := s.links[i].RxNodeID
 
 		// For every link, concurent RX and connect
-
+		log.Printf("\n For rxid %d , %#v", rxid, s.links[i])
 		NtxNodes := len(s.links[i].TxNodeIDs)
 		s.chparams[i] = make([]core.ChannelParam, NtxNodes)
 
@@ -413,6 +420,8 @@ func (s *SFN) createDefaultPDP() {
 			s.associatedTx[rxid] = s.links[i].TxNodeIDs
 			s.rxPortIDs.AppendAtEnd(rxid)
 		}
+		// log.Println("All rxportids", s.rxPortIDs)
+		// log.Println("All Txportids", s.txPortIDs)
 
 		for j, tid := range s.links[i].TxNodeIDs {
 			s.chparams[i][j] = core.DefaultChannel()
