@@ -41,7 +41,7 @@ func (c *SimpleReceiver) StartReceive(rxch gocomm.Complex128AChannel) {
 	for i := 0; ; i++ {
 		// log.Printf("CSFReceiver: Rx-%d Waiting to read data at Input ", c.GetID())
 		rdata := <-rxch
-		fmt.Fprintf(w, "\n%d : %#v", i, rdata)
+		fmt.Fprintf(w, "%d : %#v\n", i, rdata)
 		log.Printf("SimpleReceiver (%d): Received Packet ID  %f ", c.GetID(), rdata.TimeStamp)
 		if i == rdata.GetMaxExpected()-1 {
 			break
@@ -49,6 +49,7 @@ func (c *SimpleReceiver) StartReceive(rxch gocomm.Complex128AChannel) {
 
 	}
 	if c.wg != nil {
+		log.Println("Done receiever job of ", c.GetID())
 		c.wg.Done()
 	}
 
