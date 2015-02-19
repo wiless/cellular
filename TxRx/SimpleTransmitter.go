@@ -166,6 +166,7 @@ func (s *SimpleTransmitter) StartTransmit() {
 		default:
 			log.Println("Unable to write to probe")
 		}
+
 	}
 
 	if s.wg != nil {

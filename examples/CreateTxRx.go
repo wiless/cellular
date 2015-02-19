@@ -39,9 +39,8 @@ func main() {
 	for i := 0; i < Ntx; i++ {
 		tx[i].Init()
 		tx[i].SetID(i + 100)
-		tx[i].Nblocks = 200
-		tx[i].BlockLen = 32
-
+		tx[i].Nblocks = 1000
+		tx[i].BlockLen = 128
 	}
 
 	rx := make([]TxRx.SimpleReceiver, Ntx)
@@ -56,9 +55,9 @@ func main() {
 	SNRdB := 10.0
 	for i := 0; i < Ntx; i++ {
 		if i == 0 {
-			SNRdB = 105
+			SNRdB = 15
 		} else {
-			SNRdB = 105
+			SNRdB = 15
 		}
 		links[i] = cellular.CreateSimpleLink(rx[i].GetID(), tx[i].GetID(), SNRdB)
 		// log.Printf("Links between %d->%d : %#v", tx[i].GetID(), rx[i].GetID(), links[i])
@@ -83,15 +82,16 @@ func main() {
 
 	}
 
-	// txprobe0 := tx[0].GetProbe(0)
-	// go sink.CROcomplexAScatter(txprobe0)
+	txprobe0 := tx[0].GetProbe(0)
+	sink.GLOBALADDRESS = "192.168.0.23:8080"
+	go sink.CROcomplexAScatter(txprobe0)
 	// txprobe1 := tx[1].GetProbe(0)
 	// go sink.CROcomplexAScatter(txprobe1)
 
 	rxprobe0 := rx[0].GetProbe(0)
 	go sink.CROcomplexAScatter(rxprobe0)
-	// rxprobe1 := rx[1].GetProbe(0)
-	// go sink.CROcomplexAScatter(rxprobe1)
+	rxprobe1 := rx[1].GetProbe(0)
+	go sink.CROcomplexAScatter(rxprobe1)
 
 	channelEmulator.Init()
 	channelEmulator.Start()

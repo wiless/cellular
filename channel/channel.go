@@ -9,6 +9,7 @@ import (
 	"github.com/wiless/vlib"
 	"log"
 	"sync"
+	"time"
 )
 
 func init() {
@@ -266,19 +267,19 @@ func (s *SFN) startRxManager() {
 					/// Add Noise as given in link
 					NoisePower := vlib.InvDb(s.links[chindx].N0)
 					noise := vlib.RandNCVec(rxsamples.Size(), NoisePower)
+					rxsamples = rxsamples.Scale(2)
 					if rxid == 200 {
 						scale := vlib.GetEJtheta(22)
-						faded := rxsamples.ScaleC(scale)
-						re := vlib.NewOnesF(len(rxsamples))
-						im := vlib.NewVectorF(len(rxsamples)).Add(rxobj.TimeStamp / 200.0)
-						faded = vlib.ToVectorC2(re, im)
+						rxsamples = rxsamples.ScaleC(scale)
+						// re := vlib.NewOnesF(len(rxsamples))
+						// im := vlib.NewVectorF(len(rxsamples)).Add(rxobj.TimeStamp / 200.0)
+						// faded = vlib.ToVectorC2(re, im)
 						//
 						// log.Println("**************************************  did rotations with ", rxsamples[0:10])
-						log.Println("**************************************  did rotations with ", faded[0:10])
-						rxobj.Ch = faded // .AddVector(noise)
-					} else {
-						rxobj.Ch = rxsamples.AddVector(noise)
+						// log.Println("**************************************  did rotations with ", faded[0:10])
+						rxobj.Ch = rxsamples // .AddVector(noise)
 					}
+					rxobj.Ch = rxsamples.AddVector(noise)
 
 					cnt++
 
@@ -299,6 +300,7 @@ func (s *SFN) startRxManager() {
 		if s.rxMgr.ShouldACK(txid) {
 			log.Printf("RxMgr Sending ACK for TxID %d (Total Transmissions %d)", txid, cnt)
 			s.rxMgr.feedbackRx2Tx <- txid
+			time.Sleep(250 * time.Millisecond)
 		}
 
 	}
