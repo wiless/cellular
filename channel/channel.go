@@ -47,17 +47,17 @@ type Channel struct {
 }
 
 type SFN struct {
-	links        []cell.LinkMetric
-	chparams     [][]core.ChannelParam
-	freqGHz      float64
-	txPortIDs    vlib.VectorI
-	rxPortIDs    vlib.VectorI
-	rxSamples    map[int]vlib.VectorC
-	txMgr        TransmitterBufferManager
-	rxMgr        ReceiverBufferManager
-	associatedRx map[int]vlib.VectorI // Lookup of all rxids affected by a transmission of a transmitter
-	associatedTx map[int]vlib.VectorI // Lookup of all txids affecting a receiver
-	wg           sync.WaitGroup
+	links          []cell.LinkMetric
+	chparams       [][]core.ChannelParam
+	freqGHz        float64
+	txPortIDs      vlib.VectorI
+	rxPortIDs      vlib.VectorI
+	txMgr          TransmitterBufferManager
+	rxMgr          ReceiverBufferManager
+	associatedRx   map[int]vlib.VectorI // Lookup of all rxids affected by a transmission of a transmitter
+	associatedTx   map[int]vlib.VectorI // Lookup of all txids affecting a receiver
+	Port2LinkIndex map[int]int          // Lookup of the row index for the given receiver-id
+	wg             sync.WaitGroup
 }
 
 type TransmitterBuffer struct {
@@ -232,10 +232,21 @@ func (s *SFN) startRxManager() {
 			mgrwg.Add(1)
 			go func(rid int) {
 				rxbufr := s.rxMgr.rxOutputBuffer[rid]
+				chindx, ok := s.Port2LinkIndex[rxid]
+				if !ok {
+					log.Panicln("RxMgr: No link information for rxid ", chindx)
+				}
+
 				txsamples := txobj.Ch
 				/// Ideally Do convolution
 				// conv and ...
-				//
+				// for j, t := range s.links[chindx].TxNodeIDs {
+				// 	if t == txid {
+				// 		s.chparams[chindx][j].Coeff
+				// 	}
+
+				// }
+
 				//
 				///
 				rxsamples := txsamples
@@ -251,7 +262,24 @@ func (s *SFN) startRxManager() {
 					var rxobj gocomm.SComplex128AObj
 					/// Change extra params if needed
 					rxobj = txobj
-					rxobj.Ch = rxsamples
+
+					/// Add Noise as given in link
+					NoisePower := vlib.InvDb(s.links[chindx].N0)
+					noise := vlib.RandNCVec(rxsamples.Size(), NoisePower)
+					if rxid == 200 {
+						scale := vlib.GetEJtheta(22)
+						faded := rxsamples.ScaleC(scale)
+						re := vlib.NewOnesF(len(rxsamples))
+						im := vlib.NewVectorF(len(rxsamples)).Add(rxobj.TimeStamp / 200.0)
+						faded = vlib.ToVectorC2(re, im)
+						//
+						// log.Println("**************************************  did rotations with ", rxsamples[0:10])
+						log.Println("**************************************  did rotations with ", faded[0:10])
+						rxobj.Ch = faded // .AddVector(noise)
+					} else {
+						rxobj.Ch = rxsamples.AddVector(noise)
+					}
+
 					cnt++
 
 					/// Write to Reciever
@@ -301,7 +329,7 @@ func (t *TransmitterBufferManager) Start() {
 		go func(tidx int, txb *TransmitterBuffer) {
 			txb.Update()
 			txb.SetState(DataSent)
-			// log.Printf("TxMgr - ONETIME : Fetching txid %d (%d), State:%v , Packet : %f  Message=%s ", tidx, txb.id, txb.state, txb.data.TimeStamp, txb.data.Message)
+			log.Printf("TxMgr - ONETIME : Fetching txid %d (%d), State:%v , Packet : %f  Message=%s ", tidx, txb.id, txb.state, txb.data.TimeStamp, txb.data.Message)
 			t.feedbackTx2Rx <- tidx
 			wg.Done()
 		}(tid, tx)
@@ -353,14 +381,14 @@ func (t *TransmitterBufferManager) Start() {
 func (s *SFN) StartBufferManager() {
 	s.wg.Add(1)
 	go s.startRxManager()
-	// log.Println(".....=========================================.................Starting.. buffer manager ")
+
 	s.txMgr.Start()
 	s.wg.Wait()
-	// time.Sleep(10 * time.Second)
 }
 
 func (s *SFN) createDefaultPDP() {
 	s.chparams = make([][]core.ChannelParam, len(s.links))
+	s.Port2LinkIndex = make(map[int]int)
 	s.associatedRx = make(map[int]vlib.VectorI)
 	s.associatedTx = make(map[int]vlib.VectorI)
 	s.txPortIDs.Resize(0)
@@ -372,7 +400,7 @@ func (s *SFN) createDefaultPDP() {
 		// For every link, concurent RX and connect
 		NtxNodes := len(s.links[i].TxNodeIDs)
 		s.chparams[i] = make([]core.ChannelParam, NtxNodes)
-
+		s.Port2LinkIndex[rxid] = i
 		if _, ok := s.associatedTx[rxid]; ok {
 			log.Println("Duplicate Link found for %d !! ", rxid)
 		} else {
@@ -490,8 +518,8 @@ func (c *Channel) Start(sfids ...int) {
 				c.sflinks[sfid].txMgr.Set(tid, readCH)
 
 			}
-			// log.Println("Setting WG = ", &wg)
 
+			/// Start Concurrent Transmission process
 			for indx, tx := range c.txnodes {
 				tx.SetWaitGroup(&wg)
 				wg.Add(1)
@@ -501,7 +529,8 @@ func (c *Channel) Start(sfids ...int) {
 				// log.Printf("%d Tx Started...done.. %#v", indx, tx.GetID())
 			}
 
-			for indx, rid := range rxnodeIDs {
+			/// Start Concurrent Receiver process
+			for _, rid := range rxnodeIDs {
 				rx, ok := c.rxnodes[rid]
 				if !ok {
 					log.Panicln("Surprising !! No Receiver attached for ", rid)
@@ -509,7 +538,7 @@ func (c *Channel) Start(sfids ...int) {
 
 				rx.SetWaitGroup(&wg)
 				wg.Add(1)
-				log.Printf("%d Rx Started... %#v", indx, rid)
+				log.Printf("Rx Started... %d", rid)
 				writeCH := c.sflinks[sfid].rxMgr.GetCh(rid)
 				go rx.StartReceive(writeCH)
 			}
@@ -530,7 +559,7 @@ func (c *Channel) AddTransmiter(tx cell.Transmitter) {
 		log.Println("Tx Overwriting Node ", tx.GetID(), val)
 	} else {
 		c.txnodes[tx.GetID()] = tx
-		// log.Println("Transmitter Added Node ", tx.GetID())
+
 	}
 
 }
@@ -605,8 +634,9 @@ func (c *Channel) Init() {
 			log.Panicln("All rxports not associcated with Receivers")
 		}
 
-		downlinkfb := make(chan int, 10)
-		uplinkfb := make(chan int, 10)
+		downlinkfb := make(chan int, 100)
+		uplinkfb := make(chan int, 100)
+
 		c.sflinks[i].txMgr.feedbackTx2Rx = downlinkfb
 		c.sflinks[i].txMgr.feedbackRx2Tx = uplinkfb
 

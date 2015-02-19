@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/wiless/gocomm/sink"
 	"math/rand"
 
 	"github.com/wiless/cellular"
@@ -33,51 +34,67 @@ func init() {
 func main() {
 	starttime := time.Now()
 
-	Ntx := 10
+	Ntx := 2
 	tx := make([]TxRx.SimpleTransmitter, Ntx)
-
 	for i := 0; i < Ntx; i++ {
 		tx[i].Init()
-		tx[i].SetID(i + 200)
-		tx[i].Nblocks = 30
+		tx[i].SetID(i + 100)
+		tx[i].Nblocks = 200
+		tx[i].BlockLen = 32
 
 	}
-	rx := make([]TxRx.SimpleReceiver, Ntx)
 
+	rx := make([]TxRx.SimpleReceiver, Ntx)
 	for i := 0; i < Ntx; i++ {
 		rx[i].Init()
-		rx[i].SetID(100 + i)
+		rx[i].SetID(200 + i)
 	}
-	//var sisochannel channel.Channel
-	// sisochannel.CreateFromFile("linkmetric2.json")
+	//var channelEmulator channel.Channel
+	// channelEmulator.CreateFromFile("linkmetric2.json")
 
 	links := make([]cellular.LinkMetric, Ntx)
+	SNRdB := 10.0
 	for i := 0; i < Ntx; i++ {
-
-		links[i] = cellular.CreateSimpleLink(rx[i].GetID(), tx[i].GetID(), 10)
+		if i == 0 {
+			SNRdB = 105
+		} else {
+			SNRdB = 105
+		}
+		links[i] = cellular.CreateSimpleLink(rx[i].GetID(), tx[i].GetID(), SNRdB)
 		// log.Printf("Links between %d->%d : %#v", tx[i].GetID(), rx[i].GetID(), links[i])
 	}
-	sisochannel := channel.NewWirelessChannel(links)
-	sfid := sisochannel.SFNids()[0]
+	// time.Sleep(100 * time.Second)
+
+	channelEmulator := channel.NewWirelessChannel(links)
+
+	// sfid := channelEmulator.SFNids()[0]
 	{
-		txnodesIds := sisochannel.GetTxNodeIDs(sfid)
-		for indx, txid := range txnodesIds {
-			tx[indx].SetID(txid)
+		for indx := 0; indx < Ntx; indx++ {
 			var systx cellular.Transmitter
 			systx = &tx[indx]
-			sisochannel.AddTransmiter(systx)
+			channelEmulator.AddTransmiter(systx)
 		}
-		rxnodesIds := sisochannel.GetRxNodeIDs(sfid)
-		for indx, rxid := range rxnodesIds {
-			rx[indx].SetID(rxid)
+
+		for indx := 0; indx < Ntx; indx++ {
 			var sysrx cellular.Receiver
 			sysrx = &rx[indx]
-			sisochannel.AddReceiver(sysrx)
+			channelEmulator.AddReceiver(sysrx)
 		}
 
 	}
-	sisochannel.Init()
-	sisochannel.Start()
+
+	// txprobe0 := tx[0].GetProbe(0)
+	// go sink.CROcomplexAScatter(txprobe0)
+	// txprobe1 := tx[1].GetProbe(0)
+	// go sink.CROcomplexAScatter(txprobe1)
+
+	rxprobe0 := rx[0].GetProbe(0)
+	go sink.CROcomplexAScatter(rxprobe0)
+	// rxprobe1 := rx[1].GetProbe(0)
+	// go sink.CROcomplexAScatter(rxprobe1)
+
+	channelEmulator.Init()
+	channelEmulator.Start()
 	log.Println("Done..")
 	matlab.Close()
 	log.Println("Time Elapsed ", time.Since(starttime))

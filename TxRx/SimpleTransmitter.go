@@ -70,15 +70,22 @@ type SimpleTransmitter struct {
 	sch      gocomm.Complex128AChannel
 	proxyPin gocomm.Complex128AChannel
 	Nblocks  int
+	BlockLen int
 	wg       *sync.WaitGroup
 	// All Core Chips
-	qpsk *core.Modem
-	seed uint32
-	key  string
+	Txmodem *core.Modem
+	seed    uint32
+	key     string
+
+	probes []gocomm.Complex128AChannel
 }
 
 func (s *SimpleTransmitter) SetID(id int) {
 	s.nid = id
+}
+
+func (s *SimpleTransmitter) NProbes() int {
+	return len(s.probes)
 }
 
 func (s SimpleTransmitter) GetChannel() gocomm.Complex128AChannel {
@@ -97,19 +104,30 @@ func (s *SimpleTransmitter) Init() {
 	s.sch = gocomm.NewComplex128AChannel()
 	s.proxyPin = nil
 	s.Nblocks = 10
+	s.BlockLen = 32 // No of bits
 	s.seed = rand.Uint32()
 	s.key = string(vlib.RandString(5))
 
-	s.qpsk = new(core.Modem)
-	s.qpsk.SetName(s.Key() + "_MODEM")
+	s.Txmodem = new(core.Modem)
+	s.Txmodem.SetName(s.Key() + "_MODEM")
 
-	s.qpsk.Init(2, "QPSK")
-	s.qpsk.InitializeChip()
+	s.Txmodem.Init(2, "QPSK")
+	s.Txmodem.InitializeChip()
+
+	s.probes = make([]gocomm.Complex128AChannel, 1)
+	s.probes[0] = gocomm.NewComplex128AChannel()
 
 }
 
 func (s *SimpleTransmitter) Key() string {
 	return s.key
+}
+
+func (s *SimpleTransmitter) GetProbe(prbId int) gocomm.Complex128AChannel {
+	if prbId >= s.NProbes() {
+		log.Panicln("Tx:GetProbe Index out of bound")
+	}
+	return s.probes[prbId]
 }
 
 func (s *SimpleTransmitter) CreateCircuit() {
@@ -127,7 +145,7 @@ func (s *SimpleTransmitter) StartTransmit() {
 	chdata.MaxExpected = s.Nblocks
 	chdata.Message = s.key
 	chdata.Ts = 1
-	N := 32 // 32bits=16SYMBOLS per TTI
+	N := s.BlockLen // 32bits=16SYMBOLS per TTI
 
 	// log.Println("Transmitter: Ready to send ??")
 	chdata.TimeStamp = -1
@@ -135,16 +153,23 @@ func (s *SimpleTransmitter) StartTransmit() {
 
 		/// Modulation data
 
-		chdata.Next(s.qpsk.ModulateBits(vlib.RandB(N)))
+		chdata.Next(s.Txmodem.ModulateBits(vlib.RandB(N)))
 		log.Printf("Transmitter %d , @ TimeStamp : %f : Writing (%d)symbols into Go-chan ", s.GetID(), chdata.TimeStamp, len(chdata.Ch))
 		// Do other transmitter processing like CDMA/OFDM etc.if applicable
 
 		// Finally write to output Pin of Transmitter
 		s.sch <- chdata
+		///write to probe
+		select {
+		case s.probes[0] <- chdata:
+			log.Println("===========Tx wrote to Probe===========")
+		default:
+			log.Println("Unable to write to probe")
+		}
 	}
 
 	if s.wg != nil {
-
+		log.Println("Done Transmission job of all Nblocks of data ", s.GetID())
 		s.wg.Done()
 	}
 
