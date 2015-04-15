@@ -6,6 +6,8 @@ import (
 	"math/rand"
 	"time"
 
+	cell "github.com/wiless/cellular"
+
 	"github.com/grd/statistics"
 	"github.com/wiless/cellular/antenna"
 	"github.com/wiless/cellular/deployment"
@@ -30,6 +32,7 @@ type LinkInfo struct {
 }
 
 var angles vlib.VectorF = vlib.VectorF{45, -45, -135, -45}
+var singlecell deployment.DropSystem
 
 func main() {
 	matlab = vlib.NewMatlab("deployment")
@@ -40,9 +43,9 @@ func main() {
 	/// Setting to fixed seed
 	seedvalue = 0
 	rand.Seed(seedvalue)
-	// fmt.Printf("The sample mean is %g", mean)
 
-	var singlecell deployment.DropSystem
+	templateAAS = antenna.NewAAS()
+	templateAAS.SetDefault()
 
 	// modelsett:=pathloss.NewModelSettingi()
 	var model pathloss.PathLossModel
@@ -50,9 +53,30 @@ func main() {
 	model.ModelSetting.Param[0] = 2
 	DeployLayer1(&singlecell)
 
-	lininfo := CalculatePathLoss(&singlecell, &model)
+	singlecell.SetAllNodeProperty("BS", "AntennaType", 0)
+	singlecell.SetAllNodeProperty("UE", "AntennaType", 1) /// Set All Pico to use antenna Type 1
 
-	vlib.SaveStructure(lininfo, "linkinfo.json", true)
+	singlecell.SetAllNodeProperty("BS", "FreqGHz", vlib.VectorF{0.4, 2.1}) /// Set All Pico to use antenna Type 0
+	singlecell.SetAllNodeProperty("UE", "FreqGHz", vlib.VectorF{0.4, 2.1}) /// Set All Pico to use antenna Type 0
+
+	// lininfo := CalculatePathLoss(&singlecell, &model)
+
+	rxids := singlecell.GetNodeIDs("UE")
+	type MFNMetric []cell.LinkMetric
+	MetricPerRx := make(map[int]MFNMetric)
+	var AllMetrics MFNMetric
+	for _, rxid := range rxids {
+		metrics := cell.EvaluteMetric(&singlecell, &model, rxid, myfunc)
+		if len(metrics) > 1 {
+			log.Printf("%s[%d] Supports %d Carriers", "UE", rxid, len(metrics))
+			// log.Printf("%s[%d] Links %#v ", "UE", rxid, metrics)
+		}
+		AllMetrics = append(AllMetrics, metrics...)
+		MetricPerRx[rxid] = metrics
+	}
+	// vlib.SaveMapStructure2(MetricPerRx, "linkmetric.json", "UE", "LinkMetric", true)
+	vlib.SaveStructure(AllMetrics, "linkmetric2.json", true)
+
 	fmt.Println("\n")
 	matlab.Close()
 	fmt.Println("\n")
@@ -108,13 +132,12 @@ func CalculatePathLoss(singlecell *deployment.DropSystem, model *pathloss.PathLo
 				N := txlocs.Size()
 
 				for k := 0; k < N; k++ {
-
 					// angle := float64((k) * 360 / N)
 					if name == "BS" {
-						templateAAS.HTiltAngle = angles[k]
+						// templateAAS.HTiltAngle = 0 //angles[k]
 						templateAAS.Omni = false
 					} else {
-						templateAAS.HTiltAngle = 0
+						// templateAAS.HTiltAngle = 0
 						templateAAS.Omni = true
 					}
 
@@ -177,4 +200,10 @@ func DeployLayer1(system *deployment.DropSystem) {
 
 	vlib.SaveStructure(&system, "giridep.json", true)
 
+}
+
+func myfunc(nodeID int) antenna.SettingAAS {
+	// atype := singlecell.Nodes[txnodeID]
+	/// all nodeid same antenna
+	return *templateAAS
 }

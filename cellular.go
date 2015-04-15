@@ -1,20 +1,21 @@
 package cellular
 
 import (
+	"sync"
+
 	"github.com/wiless/gocomm"
 	"github.com/wiless/vlib"
-	"sync"
 )
 
 type GenericStruct map[string]interface{}
 
-type LinkInfo struct {
-	RxNodeID          int
-	NodeTypes         []string
-	LinkGain          vlib.VectorF
-	LinkGainNode      vlib.VectorI
-	InterferenceLinks vlib.VectorF
-}
+// type LinkInfo struct {
+// 	RxNodeID          int
+// 	NodeTypes         []string
+// 	LinkGain          vlib.VectorF
+// 	LinkGainNode      vlib.VectorI
+// 	InterferenceLinks vlib.VectorF
+// }
 
 type LinkMetric struct {
 	RxNodeID     int
