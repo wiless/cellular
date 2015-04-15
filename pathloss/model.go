@@ -7,9 +7,10 @@ import (
 
 	// "flag"
 
-	"github.com/wiless/vlib"
 	"math"
 	"math/cmplx"
+
+	"github.com/wiless/vlib"
 )
 
 type PathLossType int
@@ -89,8 +90,8 @@ func (p *PathLossModel) LossInDb(distance float64) float64 {
 				return 0
 			}
 			// L = 10\ n\ \log_{10}(d)+C
-
 			n, C := p.Param[0], p.Param[1]
+			n = n * p.FreqHz / 1e9
 			result := 10.0*n*math.Log10(distance) + C
 			return result
 		}
