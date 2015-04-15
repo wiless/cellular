@@ -91,6 +91,8 @@ func (p *PathLossModel) LossInDb(distance float64) float64 {
 			}
 			// L = 10\ n\ \log_{10}(d)+C
 			n, C := p.Param[0], p.Param[1]
+
+			/// Not the exact step, just a simple dependency n is small for <1GHz
 			n = n * p.FreqHz / 1e9
 			result := 10.0*n*math.Log10(distance) + C
 			return result
