@@ -83,7 +83,7 @@ func main() {
 	}
 
 	txprobe0 := tx[0].GetProbe(0)
-	sink.GLOBALADDRESS = "192.168.0.23:8080"
+	sink.GLOBALADDRESS = "localhost:8080"
 	go sink.CROcomplexAScatter(txprobe0)
 	// txprobe1 := tx[1].GetProbe(0)
 	// go sink.CROcomplexAScatter(txprobe1)

@@ -9,10 +9,12 @@ import (
 
 	ms "github.com/mitchellh/mapstructure"
 	// sim "github.com/wiless/cellular"
-	"github.com/wiless/vlib"
 	"log"
 	"math"
+	"math/cmplx"
 	"math/rand"
+
+	"github.com/wiless/vlib"
 )
 
 // func (c *Complex) MarshalJSON() ([]byte, error) {
@@ -215,7 +217,6 @@ type dDropSetting struct {
 func (d *dDropSetting) NodeCount(ntype string) int {
 	for _, val := range d.NodeTypes {
 		if val.Name == ntype {
-
 			return val.Count
 		}
 	}
@@ -318,7 +319,8 @@ func NewNodeType(name string, heights ...float64) *NodeType {
 func (d *DropSystem) SetSetting(setting *dDropSetting) {
 	d.dDropSetting = setting
 }
-func (d *DropSystem) GetSetting() *dDropSetting {
+
+func (d DropSystem) GetSetting() *dDropSetting {
 	return d.dDropSetting
 }
 
@@ -419,11 +421,16 @@ func (d *DropSystem) GetNodeType(ntype string) *NodeType {
 	}
 }
 
-func (d *DropSystem) DropNodeType(nodetype string) {
+func (d *DropSystem) DropNodeType(nodetype string) error {
 
 	// notype := d.GetNodeType(nodetype)
 	// ntype.nodeIDs = vlib.NewVectorI(ntype.count)
+
 	N := d.NodeCount(nodetype)
+	if N == -1 {
+		return errors.New("No Such Nodetypes " + nodetype)
+		log.Panicln("Unknown Nodetypes to Drop")
+	}
 	// fmt.Printf("\nDrop Nodes of Type %v : %d", d.NodeTypes[0], N)
 	// d.NodeTypes[0].startID = 20
 	// fmt.Printf("\nModified  Nodes of Type %v : %d", d.NodeTypes[0], N)
@@ -449,6 +456,7 @@ func (d *DropSystem) DropNodeType(nodetype string) {
 
 	}
 	d.PopulateHeight(nodetype)
+	return nil
 }
 
 func (d *DropSystem) PopulateHeight(ntype string) {
@@ -570,29 +578,88 @@ func RandPoint(centre complex128, radius float64) complex128 {
 	return result
 }
 
-func HexagonalPoints(centre complex128, length float64) vlib.VectorC {
+// % In the code, I will create a hexagon centered at (0,0) with radius R.
+// % The snipplets can be used in mobile capacity predicts and general
+// % systems level simulation of cellular networks.
+func HexRandU(centre complex128, hexRadius float64, Npoints int, rdegree float64) vlib.VectorC {
+	result := vlib.NewVectorC(Npoints)
+	cnt := 0
+	for j := 0; j < Npoints; {
+		sample := vlib.RandUC(1)*complex(2*hexRadius, 0) - complex(hexRadius, hexRadius)
+		r, theta := cmplx.Polar(sample)
+		theta += math.Pi
+		theta1 := (math.Mod(theta*180/math.Pi+30, 60) - 30) * math.Pi / 180
+		if r*math.Cos(theta1) <= hexRadius*math.Cos(math.Pi/6) {
+			result[j] = sample*vlib.GetEJtheta(30+rdegree) + centre
+			j++
+		}
+
+		cnt++
+
+	}
+	// log.Printf("HexRandU(@%f) : Iterated %d, for %d samples", centre, cnt, Npoints)
+	return result
+}
+
+func HexVertices(centre complex128, length float64, degree float64) vlib.VectorC {
 	result := vlib.NewVectorC(6)
 	// degree := 0.0
 	for i := 0; i < 6; i++ {
 
-		result[i] = vlib.GetEJtheta(60.0*float64(i))*complex(length, 0) + centre
+		result[i] = vlib.GetEJtheta(60.0*float64(i)+degree)*complex(length, 0) + centre
 	}
 
 	return result
 }
 
-// n = 10000;
-// Rc2 = 20;
-// Rc1 = 10;
-// Xc = -30;
-// Yc = -40;
+// HexGrid generates a grid of N Hexgons centred at `center` of size hexsize, returns an array of 3D locations of the centres of the hexgonals, This centers can be used to place the base-stations for Multi-cell simulations. The function automatically adds more hexgonal out
+func HexGrid(N int, center vlib.Location3D, hexsize float64, RDEGREE float64) []vlib.Location3D {
+	directions := []vlib.Location3D{{1, -1, 0}, {1, 0, -1}, {0, +1, -1}, {-1, +1, 0}, {-1, 0, +1}, {0, -1, +1}}
+	result := make([]vlib.Location3D, N)
 
-// theta = rand(1,n)*(2*pi);
-// r = sqrt((Rc2^2-Rc1^2)*rand(1,n)+Rc1^2);
-// x = Xc + r.*cos(theta);
-// y = Yc + r.*sin(theta);
+	n := 1
+	breakloop := true
+	if N > 1 {
+		breakloop = false
+	}
+	ROTATE := 0
+	if RDEGREE > 0 {
+		ROTATE = 1
+	}
+	for r := 0; !breakloop; r++ {
+		radius := float64(r)
+		cube := directions[4+ROTATE].Scale3D(radius)
+		for i := 0; i < 6; i++ {
+			for j := 0; j < r; j++ {
+				x := hexsize * 1.7320508 * (cube.X + cube.Z*0.5) // sqrt(3)=1.7320508
+				y := hexsize * 1.5 * cube.Z
+				result[n].X, result[n].Y = y, x
+				KK := i + ROTATE
+				if KK == 6 {
+					KK = 0
+				}
+				cube = directions[KK].Shift3D(cube)
+				n = n + 1
+				if n >= N {
+					breakloop = true
+					break
+				}
+			}
+			if breakloop {
+				break
+			}
+		}
+	}
+	for indx, res := range result {
+		if indx != 0 {
+			result[indx] = vlib.FromCmplx(res.Cmplx()*vlib.GetEJtheta(RDEGREE) + center.Cmplx())
+		}
+	}
 
-// plot(x,y,'.'); axis square
+	// log.Printf("\nAll results grid points %f ", result)
+	return result
+}
+
 func AnnularPoint(centre complex128, innerRadius, outerRadius float64) complex128 {
 	var result complex128
 	// r := math.Sqrt(rand.Float64())
@@ -716,7 +783,7 @@ func (d *DropSystem) Drop(dp *DropParameter, result *vlib.VectorC) error {
 		result = &locations
 		return nil
 	case Hexagonal:
-		locations := HexagonalPoints(dp.Centre, dp.Radius)
+		locations := HexRandU(dp.Centre, dp.Radius, dp.NCount, 0)
 		result = &locations
 		return nil
 	case Annular:
