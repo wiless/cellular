@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"time"
 
@@ -65,10 +66,14 @@ func main() {
 	type MFNMetric []cell.LinkMetric
 	MetricPerRx := make(map[int]MFNMetric)
 	var AllMetrics MFNMetric
+	wsystem := cell.NewWSystem()
+	wsystem.BandwidthMHz = 10
+	MaxCarriers := 1
 	for _, rxid := range rxids {
-		metrics := cell.EvaluteMetric(&singlecell, &model, rxid, myfunc)
+		metrics := wsystem.EvaluteMetric(&singlecell, &model, rxid, myfunc)
 		if len(metrics) > 1 {
 			log.Printf("%s[%d] Supports %d Carriers", "UE", rxid, len(metrics))
+			MaxCarriers = int(math.Max(float64(MaxCarriers), float64(len(metrics))))
 			// log.Printf("%s[%d] Links %#v ", "UE", rxid, metrics)
 		}
 		AllMetrics = append(AllMetrics, metrics...)
@@ -76,7 +81,22 @@ func main() {
 	}
 	// vlib.SaveMapStructure2(MetricPerRx, "linkmetric.json", "UE", "LinkMetric", true)
 	vlib.SaveStructure(AllMetrics, "linkmetric2.json", true)
+	//Generate SINR values for CDF
+	SINR := make(map[float64]vlib.VectorF)
 
+	for _, metric := range MetricPerRx {
+		for f := 0; f < len(metric); f++ {
+
+			temp := SINR[metric[f].FreqInGHz]
+			temp.AppendAtEnd(metric[f].BestSINR)
+			SINR[metric[f].FreqInGHz] = temp
+		}
+	}
+	cnt := 0
+	for f, sinr := range SINR {
+		log.Printf("\n F%d=%f \nSINR_%d= %v", cnt, f, cnt, sinr)
+		cnt++
+	}
 	fmt.Println("\n")
 	matlab.Close()
 	fmt.Println("\n")

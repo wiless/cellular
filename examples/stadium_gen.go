@@ -2,14 +2,15 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"math"
+	"math/rand"
+
 	"github.com/grd/statistics"
 	"github.com/wiless/cellular/antenna"
 	"github.com/wiless/cellular/deployment"
 	"github.com/wiless/cellular/pathloss"
 	"github.com/wiless/vlib"
-	"log"
-	"math"
-	"math/rand"
 
 	"time"
 )

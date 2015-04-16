@@ -12,9 +12,21 @@ import (
 
 type AntennaOfTxNode func(txnodeID int) antenna.SettingAAS
 
-func EvaluteMetric(singlecell *deployment.DropSystem, model *pathloss.PathLossModel, rxid int, afn AntennaOfTxNode) []LinkMetric {
-	BandwidthMHz := 20.0
-	NoisePSDdBm := -173.9
+type WSystem struct {
+	BandwidthMHz float64
+	NoisePSDdBm  float64
+}
+
+func NewWSystem() WSystem {
+	var result WSystem
+	result.BandwidthMHz = 10.0
+	result.NoisePSDdBm = -173.9
+	return result
+}
+
+func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model *pathloss.PathLossModel, rxid int, afn AntennaOfTxNode) []LinkMetric {
+	BandwidthMHz := w.BandwidthMHz
+	NoisePSDdBm := w.NoisePSDdBm
 	N0 := NoisePSDdBm + vlib.Db(BandwidthMHz*1e6)
 	var PerFreqLink map[float64]LinkMetric
 	PerFreqLink = make(map[float64]LinkMetric)
