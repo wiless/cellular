@@ -66,9 +66,13 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model *pathlos
 				antenna.HTiltAngle, antenna.VTiltAngle = txnode.Orientation[0], txnode.Orientation[1]
 
 				antenna.CreateElements(txnode.Location)
-				distance, _, _ := vlib.RelativeGeo(txnode.Location, rxnode.Location)
+				// distance, _, _ := vlib.RelativeGeo(txnode.Location, rxnode.Location)
 
-				lossDb := model.LossInDb(distance)
+				// lossDb := model.LossInDb(distance)
+				txnode.Location.Z = txnode.Height
+				rxnode.Location.Z = rxnode.Height
+				lossDb := model.LossInDbBetween3D(txnode.Location, rxnode.Location)
+				log.Printf("frequency==%v lossDb is %v", f, lossDb)
 				aasgain, _, _ := antenna.AASGain(rxnode.Location) /// linear scale
 				totalGainDb := vlib.Db(aasgain) - lossDb
 				link.TxNodesRSRP.AppendAtEnd(totalGainDb)

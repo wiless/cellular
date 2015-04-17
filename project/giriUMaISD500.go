@@ -57,8 +57,8 @@ func main() {
 	singlecell.SetAllNodeProperty("BS", "AntennaType", 0)
 	singlecell.SetAllNodeProperty("UE", "AntennaType", 1) /// Set All Pico to use antenna Type 1
 
-	singlecell.SetAllNodeProperty("BS", "FreqGHz", vlib.VectorF{0.4, 2.1}) /// Set All Pico to use antenna Type 0
-	singlecell.SetAllNodeProperty("UE", "FreqGHz", vlib.VectorF{0.4, 2.1}) /// Set All Pico to use antenna Type 0
+	singlecell.SetAllNodeProperty("BS", "FreqGHz", vlib.VectorF{0.4, 0.85, 1.8}) /// Set All Pico to use antenna Type 0
+	singlecell.SetAllNodeProperty("UE", "FreqGHz", vlib.VectorF{0.4, 0.85, 1.8}) /// Set All Pico to use antenna Type 0
 
 	// lininfo := CalculatePathLoss(&singlecell, &model)
 
@@ -190,11 +190,11 @@ func DeployLayer1(system *deployment.DropSystem) {
 		setting = deployment.NewDropSetting()
 	}
 
-	CellRadius := 1500.0
+	CellRadius := 200.0
 	AreaRadius := CellRadius
 	setting.SetCoverage(deployment.CircularCoverage(AreaRadius))
-	setting.AddNodeType(deployment.NodeType{Name: "BS", Hmin: 25.0, Hmax: 25.0, Count: 7})
-	setting.AddNodeType(deployment.NodeType{Name: "UE", Hmin: 0.0, Hmax: 1.5, Count: 30 * 7})
+	setting.AddNodeType(deployment.NodeType{Name: "BS", Hmin: 40.0, Hmax: 40.0, Count: 7})
+	setting.AddNodeType(deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 10.0, Count: 30 * 7})
 
 	// setting.AddNodeType(waptype)
 	/// You can save the settings of this deployment by uncommenting this line

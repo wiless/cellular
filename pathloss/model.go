@@ -117,9 +117,31 @@ func (p *PathLossModel) LossInDbBetween(src, dest complex128) float64 {
 	return p.LossInDb(distance)
 }
 
-func (p *PathLossModel) LossInDbBetween3D(src, dest vlib.VectorF) float64 {
-	distance := Distance3D(src, dest)
-	return p.LossInDb(distance)
+func (p *PathLossModel) LossInDbBetween3D(src, dest vlib.Location3D) float64 {
+	FreqMHz := p.FreqHz / 1.0e6
+	distance := src.DistanceFrom(dest) / 1.0e3
+	var result float64
+	if p.FreqHz >= 1.5e8 && p.FreqHz < 1.5e9 {
+		var Ch float64
+		// Ch = 0.8 + (1.1*math.Log10(FreqMHz)-0.7)*dest.Z - 1.56*math.Log10(FreqMHz)
+		if FreqMHz >= 150.0 && FreqMHz <= 200.0 {
+			Ch = 8.29*math.Pow(math.Log10(1.54*dest.Z), 2) - 1.1
+		} else if FreqMHz > 200.0 && FreqMHz <= 1500.0 {
+			Ch = 3.2*math.Pow(math.Log10(11.75*dest.Z), 2) - 4.97
+		}
+		result = 69.55 + 26.16*math.Log10(FreqMHz) - 13.82*math.Log10(src.Z) - Ch + (44.9-6.55*math.Log10(src.Z))*math.Log10(distance)
+	} else if p.FreqHz >= 1.5e9 && p.FreqHz < 2.0e9 {
+		a := (1.1*math.Log10(FreqMHz)-0.7)*dest.Z - (1.56*math.Log10(FreqMHz) - 0.8)
+		result = 46.3 + 33.9*math.Log10(FreqMHz) - 13.82*math.Log10(src.Z) - a + (44.9-6.55*math.Log10(src.Z))*math.Log10(distance) + 3
+	} else {
+		log.Panic("Path loss model does not valid for given frequency")
+	}
+
+	// rm := 26.16 * math.Log10(FreqMHz)
+	// log.Printf("\n Frequency %v  %v", FreqMHz, result)
+	// return p.LossInDb(distance)
+	// log.Printf("\n Height %v", src)
+	return result
 }
 
 func (p *PathLossModel) AllLossInDbBetween3D(src vlib.VectorF, dest []vlib.VectorF) vlib.VectorF {
