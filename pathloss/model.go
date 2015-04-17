@@ -15,6 +15,14 @@ import (
 
 type PathLossType int
 
+type SimplePLModel struct {
+	ModelSetting
+}
+
+type PathLossModel SimplePLModel
+
+// interface {}
+
 const (
 	Exponential PathLossType = iota
 	FreeSpace
@@ -78,11 +86,7 @@ func (s *ModelSetting) Set(str string) {
 	}
 }
 
-type PathLossModel struct {
-	ModelSetting
-}
-
-func (p *PathLossModel) LossInDb(distance float64) float64 {
+func (p *SimplePLModel) LossInDb(distance float64) float64 {
 	switch p.Type {
 	case Exponential:
 		{
@@ -112,26 +116,27 @@ func (p *PathLossModel) LossInDb(distance float64) float64 {
 	}
 }
 
-func (p *PathLossModel) LossInDbBetween(src, dest complex128) float64 {
+func (p *SimplePLModel) LossInDbBetween(src, dest complex128) float64 {
 	distance := cmplx.Abs(dest - src)
 	return p.LossInDb(distance)
 }
 
-func (p *PathLossModel) LossInDbBetween3D(src, dest vlib.VectorF) float64 {
+func (p *SimplePLModel) LossInDbBetween3D(src, dest vlib.Location3D) float64 {
 	distance := Distance3D(src, dest)
+	log.Println("Inside Loss in dB between 3d", src, dest)
 	return p.LossInDb(distance)
 }
 
-func (p *PathLossModel) AllLossInDbBetween3D(src vlib.VectorF, dest []vlib.VectorF) vlib.VectorF {
+func (p *SimplePLModel) AllLossInDbBetween3D(src vlib.Location3D, dest []vlib.Location3D) vlib.VectorF {
 	result := vlib.NewVectorF(len(dest))
 	for i := 0; i < len(dest); i++ {
-		distance := Distance3D(src, dest[i])
+		distance := src.DistanceFrom(dest[i])
 		result[i] = p.LossInDb(distance)
 	}
 	return result
 }
 
-func (p *PathLossModel) AllLossInDbBetween(src complex128, dest vlib.VectorC) vlib.VectorF {
+func (p *SimplePLModel) AllLossInDbBetween(src complex128, dest vlib.VectorC) vlib.VectorF {
 
 	result := vlib.NewVectorF(dest.Size())
 	for i := 0; i < dest.Size(); i++ {
@@ -142,12 +147,9 @@ func (p *PathLossModel) AllLossInDbBetween(src complex128, dest vlib.VectorC) vl
 
 }
 
-func Distance3D(src, dest vlib.VectorF) float64 {
-	if len(src) != 3 || len(dest) != 3 {
-		return -1
-	}
-	result := vlib.Sub(src, dest)
-	return vlib.Norm2(result)
+func Distance3D(src, dest vlib.Location3D) float64 {
+	distance := src.DistanceFrom(dest)
+	return distance
 }
 
 func Distance(src, dest complex128) float64 {

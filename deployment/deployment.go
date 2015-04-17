@@ -17,29 +17,11 @@ import (
 	"github.com/wiless/vlib"
 )
 
-// func (c *Complex) MarshalJSON() ([]byte, error) {
-// 	return []byte(fmt.Sprintf("A,%v", complex128(*c))), nil
-// }
-
-// func (c *Complex) UnmarshalJSON([]byte) error {
-// 	fmt.Print("Something")
-// 	return nil
-// }
-
-// func (v *VectorF) MarshalJSON() ([]byte, error) {
-// 	str := fmt.Sprintf("x=%f", v)
-// 	return []byte(str), nil
-// 	// return json.Marshal([]float64(v))
-// }
-// func (c vlib.Complex) String() string {
-// 	return fmt.Sprintf("S,%v", complex128(c))
-// }
-
 type Node struct {
-	Type        string
-	ID          int
-	Location    vlib.Location3D
-	Height      float64
+	Type     string
+	ID       int
+	Location vlib.Location3D
+	// Height      float64	/// moved Location member variable
 	Meta        string
 	Indoor      bool
 	Orientation vlib.VectorF
@@ -68,7 +50,6 @@ type DropParameter struct {
 // func (n Node) MarshalJSON() ([]byte, error) {
 // 	return json.Marshal(n.Meta)
 // }
-
 func (d DropParameter) MarshalJSON() ([]byte, error) {
 	// var mydata map[string]interface{}
 	// mydata = map[string]interface{}(d)
@@ -152,9 +133,7 @@ func (d *DropSystem) UnmarshalJSON(jsondata []byte) error {
 	for _, val := range nodes {
 		// val.NodeObj.id = val.ID
 		d.Nodes[val.ID] = val.NodeObj
-
 	}
-
 	return nil
 }
 
@@ -185,7 +164,6 @@ func (d *DropSystem) MarshalJSON() ([]byte, error) {
 		} else {
 			bfr.WriteByte(',')
 		}
-
 	}
 	bfr.WriteByte(']')
 	bfr.WriteString(`,"LastID":`)
@@ -261,9 +239,10 @@ func (d *DropSystem) NewNode(ntype string) *Node {
 	node.Orientation = []float64{0, 0} /// Horizontal, Vertical orientation in degree
 	node.Mode = Inactive
 	if notype.Hmin == notype.Hmax {
-		node.Height = notype.Hmin
+		node.Location.SetXY(0, 0)
+		node.Location.SetHeight(notype.Hmin)
 	} else {
-		node.Height = rand.Float64()*(notype.Hmax-notype.Hmin) + notype.Hmin
+		node.Location.SetHeight(rand.Float64()*(notype.Hmax-notype.Hmin) + notype.Hmin)
 	}
 	// node.ID = notype.startID
 	node.ID = d.lastID

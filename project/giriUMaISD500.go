@@ -49,7 +49,7 @@ func main() {
 	templateAAS.SetDefault()
 
 	// modelsett:=pathloss.NewModelSettingi()
-	var model pathloss.PathLossModel
+	var model pathloss.SimplePLModel
 	model.ModelSetting.SetDefault()
 	model.ModelSetting.Param[0] = 2
 	DeployLayer1(&singlecell)
@@ -104,7 +104,7 @@ func main() {
 
 /// Calculate Pathloss
 
-func CalculatePathLoss(singlecell *deployment.DropSystem, model *pathloss.PathLossModel) []LinkInfo {
+func CalculatePathLoss(singlecell *deployment.DropSystem, model *pathloss.SimplePLModel) []LinkInfo {
 
 	txNodeNames := singlecell.GetTxNodeNames()
 	txNodeNames = []string{"BS"} /// do only for BS

@@ -24,7 +24,7 @@ func NewWSystem() WSystem {
 	return result
 }
 
-func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model *pathloss.PathLossModel, rxid int, afn AntennaOfTxNode) []LinkMetric {
+func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model *pathloss.SimplePLModel, rxid int, afn AntennaOfTxNode) []LinkMetric {
 	BandwidthMHz := w.BandwidthMHz
 	NoisePSDdBm := w.NoisePSDdBm
 	N0 := NoisePSDdBm + vlib.Db(BandwidthMHz*1e6)
@@ -64,11 +64,12 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model *pathlos
 				antenna.Freq = f * 1.0e9
 
 				antenna.HTiltAngle, antenna.VTiltAngle = txnode.Orientation[0], txnode.Orientation[1]
-
 				antenna.CreateElements(txnode.Location)
+				log.Println("Checking Locations of Tx and Rx : ", txnode.Location, rxnode.Location)
 				distance, _, _ := vlib.RelativeGeo(txnode.Location, rxnode.Location)
-
 				lossDb := model.LossInDb(distance)
+				txnode.Location.Z = txnode.Height
+				model.LossInDbBetween3D(txnode.Location, rxnode.Location)
 				aasgain, _, _ := antenna.AASGain(rxnode.Location) /// linear scale
 				totalGainDb := vlib.Db(aasgain) - lossDb
 				link.TxNodesRSRP.AppendAtEnd(totalGainDb)
