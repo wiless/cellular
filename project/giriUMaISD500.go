@@ -66,6 +66,7 @@ func main() {
 
 	templateAAS = antenna.NewAAS()
 	templateAAS.SetDefault()
+	templateAAS.Omni = true
 
 	// modelsett:=pathloss.NewModelSettingi()
 
