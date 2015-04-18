@@ -69,7 +69,7 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss
 				// lossDb := model.LossInDb(distance)
 				//txnode.Location.Z = txnode.Height
 				// model.LossInDb3D(txnode.Location, rxnode.Location)
-				lossDb, _ := model.LossInDb3D(txnode.Location, rxnode.Location)
+				lossDb, _ := model.LossInDb3D(txnode.Location, rxnode.Location, f)
 				log.Printf("frequency==%v lossDb is %v", f, lossDb)
 				aasgain, _, _ := antenna.AASGain(rxnode.Location) /// linear scale
 				totalGainDb := vlib.Db(aasgain) - lossDb

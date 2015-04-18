@@ -14,8 +14,8 @@ import (
 type Model interface {
 	Set(ModelSetting)
 	Get() ModelSetting
-	LossInDbNodes(txnode, rxnode deployment.Node) (plDb float64, valid bool)
-	LossInDb3D(txnode, rxnode vlib.Location3D) (plDb float64, valid bool)
+	LossInDbNodes(txnode, rxnode deployment.Node, freqGHz float64) (plDb float64, valid bool)
+	LossInDb3D(txnode, rxnode vlib.Location3D, freqGHz float64) (plDb float64, valid bool)
 }
 
 type PathLossType int

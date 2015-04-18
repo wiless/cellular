@@ -45,10 +45,12 @@ func (w *Winner) Set(pathloss.ModelSetting) {
 func (w Winner) Get() pathloss.ModelSetting {
 	return pathloss.ModelSetting{}
 }
-func (w Winner) LossInDbNodes(txnode, rxnode deployment.Node) (plDb float64, valid bool) {
+func (w Winner) LossInDbNodes(txnode, rxnode deployment.Node, freqGHz float64) (plDb float64, valid bool) {
+
 	return 0, true
 }
-func (w Winner) LossInDb3D(txnode, rxnode vlib.Location3D) (plDb float64, valid bool) {
+func (w Winner) LossInDb3D(txloc, rxloc vlib.Location3D, freqGHz float64) (plDb float64, valid bool) {
+
 	return 0, true
 }
 
