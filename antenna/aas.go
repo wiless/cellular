@@ -8,9 +8,10 @@ import (
 
 	// "flag"
 	"fmt"
-	"github.com/wiless/vlib"
 	"math"
 	"math/cmplx"
+
+	"github.com/wiless/vlib"
 )
 
 var Nodes = 360
@@ -31,7 +32,7 @@ var Bobwriter io.Writer
 type SettingAAS struct {
 	elementLocations                 []vlib.Location3D
 	lamda                            float64
-	Freq                             float64
+	FreqHz                           float64
 	hColumns                         float64 // To be exported later
 	N                                int
 	Nodes                            int
@@ -53,7 +54,7 @@ type SettingAAS struct {
 }
 
 func (s *SettingAAS) SetDefault() {
-	s.Freq = 2.0e9
+	s.FreqHz = 2.0e9
 	s.N = 1
 	s.Nodes = 360
 	s.Omni = false
@@ -119,7 +120,7 @@ func (params *SettingAAS) CreateLinearElements(centre vlib.Location3D) {
 		return
 	}
 	params.Centre = centre
-	params.lamda = cspeed / params.Freq
+	params.lamda = cspeed / params.FreqHz
 	dv := params.ESpacingVFactor * params.lamda
 	// dh := params.ESpacingHFactor * params.lamda
 	params.elementLocations = make([]vlib.Location3D, params.N)
@@ -197,7 +198,7 @@ func (params *SettingAAS) CreateElements(centre vlib.Location3D) {
 /// Returns the Phase of the Signal at the given location from all its elements after applying weights at its elements
 func (params *SettingAAS) GetRxPhase(dest vlib.Location3D) []complex128 {
 	result := vlib.NewVectorC(params.N)
-	params.lamda = GetLamda(params.Freq)
+	params.lamda = GetLamda(params.FreqHz)
 	for indx, src := range params.elementLocations {
 		d, theh, thev := vlib.RelativeGeo(src, dest)
 		elemGain := complex((params.ElementEffectiveGain(theh, thev)), 0)
@@ -212,7 +213,7 @@ func (params *SettingAAS) GetRxPhase(dest vlib.Location3D) []complex128 {
 func (params *SettingAAS) AASGain(dest vlib.Location3D) (gain float64, effectiveThetaH, effectiveThetaV float64) {
 	// src := params.MyLocation()
 
-	params.lamda = cspeed / params.Freq
+	params.lamda = cspeed / params.FreqHz
 	AntennaElementLocations := vlib.Location3DtoVecC(params.elementLocations)
 
 	w := vlib.NewOnesC(params.N)
@@ -238,7 +239,7 @@ func (params *SettingAAS) AASGain(dest vlib.Location3D) (gain float64, effective
 
 func RunAAS(params SettingAAS) {
 	// fmt.Printf("\n AAS Parameters : \n %#v \n====", params)
-	freq = params.Freq
+	freq = params.FreqHz
 	N := params.N
 	Nodes = params.Nodes
 	mfileName = params.MfileName

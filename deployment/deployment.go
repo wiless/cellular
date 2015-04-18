@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"reflect"
 
-	ms "github.com/mitchellh/mapstructure"
-	// sim "github.com/wiless/cellular"
 	"log"
 	"math"
 	"math/cmplx"
 	"math/rand"
+
+	ms "github.com/mitchellh/mapstructure"
 
 	"github.com/wiless/vlib"
 )

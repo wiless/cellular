@@ -24,7 +24,7 @@ func NewWSystem() WSystem {
 	return result
 }
 
-func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model *pathloss.SimplePLModel, rxid int, afn AntennaOfTxNode) []LinkMetric {
+func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss.Model, rxid int, afn AntennaOfTxNode) []LinkMetric {
 	BandwidthMHz := w.BandwidthMHz
 	NoisePSDdBm := w.NoisePSDdBm
 	N0 := NoisePSDdBm + vlib.Db(BandwidthMHz*1e6)
@@ -50,7 +50,7 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model *pathlos
 		link.RoIDbm = -1000
 		link.N0 = N0
 		link.BandwidthMHz = BandwidthMHz
-		model.FreqHz = f * 1e9
+		// model.SetFreqHz = f * 1e9
 
 		nlinks := 0
 		for _, val := range alltxNodeIds {
@@ -61,15 +61,16 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model *pathlos
 				nlinks++
 				link.TxNodeIDs.AppendAtEnd(txnodeID)
 				antenna := afn(txnodeID)
-				antenna.Freq = f * 1.0e9
+				antenna.FreqHz = f * 1.0e9
 
 				antenna.HTiltAngle, antenna.VTiltAngle = txnode.Orientation[0], txnode.Orientation[1]
 				antenna.CreateElements(txnode.Location)
-				log.Println("Checking Locations of Tx and Rx : ", txnode.Location, rxnode.Location)
-				distance, _, _ := vlib.RelativeGeo(txnode.Location, rxnode.Location)
-				lossDb := model.LossInDb(distance)
-				txnode.Location.Z = txnode.Height
-				model.LossInDbBetween3D(txnode.Location, rxnode.Location)
+				//	log.Println("Checking Locations of Tx and Rx : ", txnode.Location, rxnode.Location)
+				// lossDb := model.LossInDb(distance)
+				//txnode.Location.Z = txnode.Height
+				// model.LossInDb3D(txnode.Location, rxnode.Location)
+				lossDb, _ := model.LossInDb3D(txnode.Location, rxnode.Location)
+				log.Printf("frequency==%v lossDb is %v", f, lossDb)
 				aasgain, _, _ := antenna.AASGain(rxnode.Location) /// linear scale
 				totalGainDb := vlib.Db(aasgain) - lossDb
 				link.TxNodesRSRP.AppendAtEnd(totalGainDb)

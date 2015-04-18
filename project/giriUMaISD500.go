@@ -35,6 +35,23 @@ type LinkInfo struct {
 var angles vlib.VectorF = vlib.VectorF{45, -45, -135, -45}
 var singlecell deployment.DropSystem
 
+type Winner struct {
+	wsettings pathloss.ModelSetting
+}
+
+func (w *Winner) Set(pathloss.ModelSetting) {
+
+}
+func (w Winner) Get() pathloss.ModelSetting {
+	return pathloss.ModelSetting{}
+}
+func (w Winner) LossInDbNodes(txnode, rxnode deployment.Node) (plDb float64, valid bool) {
+	return 0, true
+}
+func (w Winner) LossInDb3D(txnode, rxnode vlib.Location3D) (plDb float64, valid bool) {
+	return 0, true
+}
+
 func main() {
 	matlab = vlib.NewMatlab("deployment")
 	matlab.Silent = true
@@ -49,16 +66,18 @@ func main() {
 	templateAAS.SetDefault()
 
 	// modelsett:=pathloss.NewModelSettingi()
-	var model pathloss.SimplePLModel
-	model.ModelSetting.SetDefault()
-	model.ModelSetting.Param[0] = 2
+
+	var mymodel Winner
+
+	// mymodel.ModelSetting.SetDefault()
+	// mymodel.ModelSetting.Param[0] = 2
 	DeployLayer1(&singlecell)
 
 	singlecell.SetAllNodeProperty("BS", "AntennaType", 0)
 	singlecell.SetAllNodeProperty("UE", "AntennaType", 1) /// Set All Pico to use antenna Type 1
 
-	singlecell.SetAllNodeProperty("BS", "FreqGHz", vlib.VectorF{0.4, 2.1}) /// Set All Pico to use antenna Type 0
-	singlecell.SetAllNodeProperty("UE", "FreqGHz", vlib.VectorF{0.4, 2.1}) /// Set All Pico to use antenna Type 0
+	singlecell.SetAllNodeProperty("BS", "FreqGHz", vlib.VectorF{0.4, 0.85, 1.8}) /// Set All Pico to use antenna Type 0
+	singlecell.SetAllNodeProperty("UE", "FreqGHz", vlib.VectorF{0.4, 0.85, 1.8}) /// Set All Pico to use antenna Type 0
 
 	// lininfo := CalculatePathLoss(&singlecell, &model)
 
@@ -70,7 +89,7 @@ func main() {
 	wsystem.BandwidthMHz = 10
 	MaxCarriers := 1
 	for _, rxid := range rxids {
-		metrics := wsystem.EvaluteMetric(&singlecell, &model, rxid, myfunc)
+		metrics := wsystem.EvaluteMetric(&singlecell, &mymodel, rxid, myfunc)
 		if len(metrics) > 1 {
 			log.Printf("%s[%d] Supports %d Carriers", "UE", rxid, len(metrics))
 			MaxCarriers = int(math.Max(float64(MaxCarriers), float64(len(metrics))))
@@ -190,11 +209,11 @@ func DeployLayer1(system *deployment.DropSystem) {
 		setting = deployment.NewDropSetting()
 	}
 
-	CellRadius := 1500.0
+	CellRadius := 200.0
 	AreaRadius := CellRadius
 	setting.SetCoverage(deployment.CircularCoverage(AreaRadius))
-	setting.AddNodeType(deployment.NodeType{Name: "BS", Hmin: 25.0, Hmax: 25.0, Count: 7})
-	setting.AddNodeType(deployment.NodeType{Name: "UE", Hmin: 0.0, Hmax: 1.5, Count: 30 * 7})
+	setting.AddNodeType(deployment.NodeType{Name: "BS", Hmin: 40.0, Hmax: 40.0, Count: 7})
+	setting.AddNodeType(deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 10.0, Count: 30 * 7})
 
 	// setting.AddNodeType(waptype)
 	/// You can save the settings of this deployment by uncommenting this line

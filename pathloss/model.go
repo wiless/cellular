@@ -4,29 +4,21 @@ package pathloss
 import (
 	"encoding/json"
 	"log"
-
-	// "flag"
-
 	"math"
-	"math/cmplx"
+
+	"github.com/wiless/cellular/deployment"
 
 	"github.com/wiless/vlib"
 )
 
-type PathLossType int
-
-type SimplePLModel struct {
-	ModelSetting
+type Model interface {
+	Set(ModelSetting)
+	Get() ModelSetting
+	LossInDbNodes(txnode, rxnode deployment.Node) (plDb float64, valid bool)
+	LossInDb3D(txnode, rxnode vlib.Location3D) (plDb float64, valid bool)
 }
 
-type PathLossModel SimplePLModel
-
-// interface {}
-
-const (
-	Exponential PathLossType = iota
-	FreeSpace
-)
+type PathLossType int
 
 var PathLossTypes = [...]string{
 	"Exponential",
@@ -86,72 +78,7 @@ func (s *ModelSetting) Set(str string) {
 	}
 }
 
-func (p *SimplePLModel) LossInDb(distance float64) float64 {
-	switch p.Type {
-	case Exponential:
-		{
-			if distance <= p.CutOffDistance {
-				return 0
-			}
-			// L = 10\ n\ \log_{10}(d)+C
-			n, C := p.Param[0], p.Param[1]
-
-			/// Not the exact step, just a simple dependency n is small for <1GHz
-			n = n * p.FreqHz / 1e9
-			result := 10.0*n*math.Log10(distance) + C
-			return result
-		}
-	case FreeSpace:
-		{
-			if distance <= p.CutOffDistance {
-				return 0
-			}
-			// L = 20\ \log_{10}\left(\frac{4\pi d}{\lambda}\right)
-			factor := p.Param[0]
-			result := 20 * math.Log10(factor*distance)
-			return result
-		}
-	default:
-		return -100
-	}
-}
-
-func (p *SimplePLModel) LossInDbBetween(src, dest complex128) float64 {
-	distance := cmplx.Abs(dest - src)
-	return p.LossInDb(distance)
-}
-
-func (p *SimplePLModel) LossInDbBetween3D(src, dest vlib.Location3D) float64 {
-	distance := Distance3D(src, dest)
-	log.Println("Inside Loss in dB between 3d", src, dest)
-	return p.LossInDb(distance)
-}
-
-func (p *SimplePLModel) AllLossInDbBetween3D(src vlib.Location3D, dest []vlib.Location3D) vlib.VectorF {
-	result := vlib.NewVectorF(len(dest))
-	for i := 0; i < len(dest); i++ {
-		distance := src.DistanceFrom(dest[i])
-		result[i] = p.LossInDb(distance)
-	}
-	return result
-}
-
-func (p *SimplePLModel) AllLossInDbBetween(src complex128, dest vlib.VectorC) vlib.VectorF {
-
-	result := vlib.NewVectorF(dest.Size())
-	for i := 0; i < dest.Size(); i++ {
-		distance := cmplx.Abs(src - dest[i])
-		result[i] = p.LossInDb(distance)
-	}
-	return result
-
-}
-
-func Distance3D(src, dest vlib.Location3D) float64 {
-	distance := src.DistanceFrom(dest)
-	return distance
-}
-
-func Distance(src, dest complex128) float64 {
-	return cmplx.Abs(src - dest)
-}
+const (
+	Exponential PathLossType = iota
+	FreeSpace
+)
