@@ -24,6 +24,7 @@ func NewWSystem() WSystem {
 	return result
 }
 
+/// EvaluteMetric iteratively calls the path-loss m
 func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss.Model, rxid int, afn AntennaOfTxNode) []LinkMetric {
 	BandwidthMHz := w.BandwidthMHz
 	NoisePSDdBm := w.NoisePSDdBm
@@ -33,7 +34,7 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss
 	rxnode := singlecell.Nodes[rxid]
 	// nfrequencies := len(rxnode.Frequency)
 	// log.SetOutput(os.Stderr)
-	log.Printf("%s[%d] Supports %3.2f GHz", rxnode.Type, rxnode.ID, rxnode.FreqGHz)
+	// log.Printf("%s[%d] Supports %3.2f GHz", rxnode.Type, rxnode.ID, rxnode.FreqGHz)
 	txnodeTypes := singlecell.GetTxNodeNames()
 
 	var alltxNodeIds vlib.VectorI
@@ -70,12 +71,12 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss
 				//txnode.Location.Z = txnode.Height
 				// model.LossInDb3D(txnode.Location, rxnode.Location)
 				lossDb, _ := model.LossInDb3D(txnode.Location, rxnode.Location, f)
-				log.Printf("frequency==%v lossDb is %v", f, lossDb)
+				// log.Printf("frequency==%v lossDb is %v", f, lossDb)
 				aasgain, _, _ := antenna.AASGain(rxnode.Location) /// linear scale
 				totalGainDb := vlib.Db(aasgain) - lossDb
 				link.TxNodesRSRP.AppendAtEnd(totalGainDb)
 
-				log.Printf("%s[%d] : TxNode %d : Link @ %3.2fGHz  : %-4.3fdB", rxnode.Type, rxid, val, f, totalGainDb)
+				// log.Printf("%s[%d] : TxNode %d : Link @ %3.2fGHz  : %-4.3fdB", rxnode.Type, rxid, val, f, totalGainDb)
 
 			} else {
 				log.Printf("%s[%d] : TxNode %d : No Link on %3.2fGHz", rxnode.Type, rxid, val, f)

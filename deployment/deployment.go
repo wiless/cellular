@@ -169,7 +169,7 @@ func (d *DropSystem) MarshalJSON() ([]byte, error) {
 	bfr.WriteString(`,"LastID":`)
 	enc.Encode(d.lastID)
 	bfr.WriteString("}")
-	fmt.Printf("\n %s ", bfr.Bytes())
+	// fmt.Printf("\n %s ", bfr.Bytes())
 	return bfr.Bytes(), nil
 }
 
@@ -500,6 +500,25 @@ func (d *DropSystem) SetNodeLocationOf(ntype string, nodeIDs vlib.VectorI, locat
 		d.SetNodeLocation(ntype, nodeIDs[i], locations[i])
 	}
 }
+
+func (d *DropSystem) SetAllNodeLocation3D(ntype string, locations []vlib.Location3D) {
+	notype := d.GetNodeType(ntype)
+
+	// fmt.Println("No. of Total Nodes is ", len(d.Nodes))
+	// fmt.Println("No. of Locations is ", locations.Size())
+	// fmt.Println("No. of NodeIDs is ", notype)
+	if len(locations) != len(notype.NodeIDs) {
+		log.Panicln("DropSystem::SetAllNodeLocation - #of Nodes", len(notype.NodeIDs), " Arg : Locations", len(locations))
+	}
+
+	for indx, val := range notype.NodeIDs {
+		node := d.Nodes[val]
+		node.Location = locations[indx]
+		d.Nodes[val] = node
+
+	}
+}
+
 func (d *DropSystem) SetAllNodeLocation(ntype string, locations vlib.VectorC) {
 	notype := d.GetNodeType(ntype)
 
@@ -512,7 +531,7 @@ func (d *DropSystem) SetAllNodeLocation(ntype string, locations vlib.VectorC) {
 
 	for indx, val := range notype.NodeIDs {
 		node := d.Nodes[val]
-		node.Location.FromCmplx(locations[indx])
+		node.Location.SetXY(real(locations[indx]), imag(locations[indx]))
 		d.Nodes[val] = node
 
 	}

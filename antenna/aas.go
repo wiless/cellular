@@ -384,6 +384,7 @@ func (params *SettingAAS) FindWeights(theta float64) vlib.VectorC {
 
 }
 
+// Angle expected between -180 to 180
 func (s SettingAAS) ElementDirectionHGain(degree float64) float64 {
 	if s.Omni {
 		return 1.0
