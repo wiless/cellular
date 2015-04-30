@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/wiless/vlib"
 
 	// "encoding/json"
@@ -15,14 +16,15 @@ func main() {
 
 	vcell1.SetDefault()
 	vcell1.N = 4
-	vcell1.Freq = 1e9
+	vcell1.FreqHz = 1e9
 	vcell1.BeamTilt = 0
 	vcell1.DisableBeamTit = true
 	vcell1.VTiltAngle = 0
 	vcell1.ESpacingVFactor = .5
-	vcell1.HTiltAngle = 0
-	vcell1.Omni = false
+	vcell1.HTiltAngle = -120
 	vcell1.MfileName = "output.m"
+	vcell1.Omni = false
+
 	vcell1.HoldOn = false
 	vcell1.AASArrayType = antenna.LinearPhaseArray
 	vcell1.CurveWidthInDegree = 30.0
@@ -38,9 +40,41 @@ func main() {
 	fmt.Printf("\nLamda %#v", vcell1.GetLamda())
 
 	///fmt.Printf("\nAntenna=%f", vlib.Location3DtoVecC(vcell1.GetElements()))
+	vpattern := vlib.NewVectorF(360)
+	hpattern := vlib.NewVectorF(360)
+	anglesRad := vlib.NewVectorF(360)
 
-	// vcell1.ElementEffectiveGain(thetaH, thetaV)
+	vlib.IterateF(anglesRad)
+	k := 0
+	for i := 0.0; i < 360.0; i++ {
+		hpattern[k] = vcell1.ElementDirectionHGain(i)
+		vpattern[k] = vcell1.ElementDirectionHGain(i)
+		k++
+	}
+	var matlab vlib.Matlab
+	matlab.SetDefaults()
+	matlab.SetFile("hpattern.m")
+	matlab.Silent = true
+	// matlab.Export("Weights", WeightVector)
+	// matlab.Export("AntennaLocations", AntennaElementLocations)
+	// matlab.Export("Locations", NodeLocations)
+	matlab.Export("hpattern", hpattern)
+	matlab.Export("vpattern", vpattern)
+	matlab.Export("angleRad", anglesRad)
+	// matlab.Export("N", N)
+	// matlab.Export("Lamda", params.lamda)
+
+	matlab.Command("\nangles=;")
+	matlab.Command("polar(angle(pattern),abs(pattern),'k-')")
+
+	matlab.Close()
+
+	// vcell1.ElementEffectiveGain(thetaH, 0)
 
 	// antenna.RunAAS(setting)
+
+}
+
+func Radians(d float64) (radian float64) {
 
 }

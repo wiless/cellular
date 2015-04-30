@@ -28,6 +28,7 @@ func NewWSystem() WSystem {
 func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss.Model, rxid int, afn AntennaOfTxNode) []LinkMetric {
 	BandwidthMHz := w.BandwidthMHz
 	NoisePSDdBm := w.NoisePSDdBm
+
 	N0 := NoisePSDdBm + vlib.Db(BandwidthMHz*1e6)
 	var PerFreqLink map[float64]LinkMetric
 	PerFreqLink = make(map[float64]LinkMetric)
@@ -63,20 +64,21 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss
 				link.TxNodeIDs.AppendAtEnd(txnodeID)
 				antenna := afn(txnodeID)
 				antenna.FreqHz = f * 1.0e9
-
-				antenna.HTiltAngle, antenna.VTiltAngle = txnode.Orientation[0], txnode.Orientation[1]
-				antenna.CreateElements(txnode.Location)
+				// log.Println(txnode.Orientation)
+				// antenna.HTiltAngle, antenna.VTiltAngle = txnode.Orientation[0], txnode.Orientation[1]
+				// antenna.CreateElements(txnode.Location)
 				//	log.Println("Checking Locations of Tx and Rx : ", txnode.Location, rxnode.Location)
 				// lossDb := model.LossInDb(distance)
 				//txnode.Location.Z = txnode.Height
 				// model.LossInDb3D(txnode.Location, rxnode.Location)
 				lossDb, _ := model.LossInDb3D(txnode.Location, rxnode.Location, f)
 				// log.Printf("frequency==%v lossDb is %v", f, lossDb)
-				aasgain, _, _ := antenna.AASGain(rxnode.Location) /// linear scale
-				totalGainDb := vlib.Db(aasgain) - lossDb
+				aasgain, _, _ := antenna.AASGain(rxnode.Location)    /// linear scale
+				totalGainDb := vlib.Db(aasgain) + 18.0 + 23 - lossDb // Transmit power 35dB
 				link.TxNodesRSRP.AppendAtEnd(totalGainDb)
+				// log.Println("AAS output CELL-DIRECTION gain,h,v", antenna.HTiltAngle, aasgain, thetah, thetav)
 
-				// log.Printf("%s[%d] : TxNode %d : Link @ %3.2fGHz  : %-4.3fdB", rxnode.Type, rxid, val, f, totalGainDb)
+				// log.Printf("%s[%d] : TxNode %d : Link @ %3.2fGHz  : %-4.3fdB , AntennaGain = %3.2fdB", rxnode.Type, rxid, val, f, totalGainDb, vlib.Db(aasgain))
 
 			} else {
 				log.Printf("%s[%d] : TxNode %d : No Link on %3.2fGHz", rxnode.Type, rxid, val, f)
@@ -113,6 +115,7 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss
 		}
 
 	}
+
 	result := make([]LinkMetric, len(PerFreqLink))
 	var cnt int = 0
 	for _, val := range PerFreqLink {

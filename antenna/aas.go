@@ -448,18 +448,8 @@ func (s SettingAAS) ElementDirectionGain(theta float64) float64 {
 	theta3Db := 65.0 * math.Pi / 180.0
 	SLAV := 20.0
 	tilt := -s.VTiltAngle * math.Pi / 180.0
-	// fmt.Printf("\n %% %f dump %v", theta, math.Min(12.0*math.Pow((theta-tilt)/theta3Db, 2), SLAV))
+
 	return math.Pow(10, -math.Min(12.0*math.Pow((theta-tilt)/theta3Db, 2), SLAV)/10.0)
-
-	// if theta >= -math.Pi/2 && theta <= math.Pi/2 {
-	// 	return 1
-	// 	// math.Abs(math.Cos(theta))
-	// } else {
-	// 	return 0.2 * math.Abs(math.Cos(theta))
-	// }
-
-	// return math.Abs(math.Cos(theta))
-	// return math.Abs(real(cmplx.Exp(-complex(0.0, theta)))
 }
 
 /// Draws nNodes in a circular fashion centered around 0,0

@@ -18,16 +18,35 @@ import (
 )
 
 var matlab *vlib.Matlab
-
+var defaultAAS antenna.SettingAAS
 var templateAAS []antenna.SettingAAS
 
 var singlecell deployment.DropSystem
-var secangles = vlib.VectorF{0.0, 20.0, -20.0}
+var secangles = vlib.VectorF{0.0, 120.0, -120.0}
 var nSectors = 3
-var CellRadius = 500.0
-var nUEPerCell = 30
-var nCells = 1
+var CellRadius = 250.0
+var nUEPerCell = 200
+var nCells = 7
 var CarriersGHz = vlib.VectorF{1.8}
+
+func init() {
+
+	defaultAAS.SetDefault()
+	defaultAAS.N = 1
+	defaultAAS.FreqHz = CarriersGHz[0]
+	defaultAAS.BeamTilt = 0
+	defaultAAS.DisableBeamTit = false
+	defaultAAS.VTiltAngle = 30
+	defaultAAS.ESpacingVFactor = .5
+	defaultAAS.HTiltAngle = 0
+	defaultAAS.MfileName = "output.m"
+	defaultAAS.Omni = false
+
+	defaultAAS.HoldOn = false
+	defaultAAS.AASArrayType = antenna.LinearPhaseArray
+	defaultAAS.CurveWidthInDegree = 30.0
+	defaultAAS.CurveRadius = 1.00
+}
 
 func main() {
 	matlab = vlib.NewMatlab("deployment")
@@ -77,6 +96,7 @@ func main() {
 		for f := 0; f < len(metric); f++ {
 
 			temp := SINR[metric[f].FreqInGHz]
+			// temp.AppendAtEnd(metric[f].BestRSRP - (metric[f].N0))
 			temp.AppendAtEnd(metric[f].BestSINR)
 
 			SINR[metric[f].FreqInGHz] = temp
@@ -99,6 +119,7 @@ func main() {
 		legendstring += str + " "
 		cnt++
 	}
+
 	matlab.Command(fmt.Sprintf("legend %v", legendstring))
 	matlab.Close()
 	fmt.Println("\n")
@@ -164,7 +185,7 @@ func DeployLayer1(system *deployment.DropSystem) {
 
 	for i := 0; i < len(templateAAS); i++ {
 		templateAAS[i] = *antenna.NewAAS()
-		templateAAS[i].SetDefault()
+		templateAAS[i] = defaultAAS
 		templateAAS[i].FreqHz = CarriersGHz[0] * 1.e9
 		// templateAAS[i].HBeamWidth = 65
 		templateAAS[i].HTiltAngle = secangles[vlib.ModInt(i, 3)]
@@ -177,12 +198,18 @@ func DeployLayer1(system *deployment.DropSystem) {
 
 		hgain := vlib.NewVectorF(360)
 		cnt := 0
-		for d := -180; d < 180; d++ {
+		cmd := `delta=pi/180;
+phaseangle=0:delta:2*pi-delta;`
+		matlab.Command(cmd)
+		for d := 0; d < 360; d++ {
 			hgain[cnt] = templateAAS[i].ElementDirectionHGain(float64(d))
 			cnt++
 		}
+
 		matlab.Export("gain"+strconv.Itoa(i), hgain)
 
+		cmd = fmt.Sprintf("polar(phaseangle,gain%d);hold all", i)
+		matlab.Command(cmd)
 	}
 	vlib.SaveStructure(templateAAS, "antennaArray.json")
 	vlib.SaveStructure(system, "dep.json", true)
