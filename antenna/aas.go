@@ -51,6 +51,7 @@ type SettingAAS struct {
 	AASArrayType                     ArrayType
 	CurveWidthInDegree               float64
 	CurveRadius                      float64
+	GainDb                           float64
 }
 
 func (s *SettingAAS) SetDefault() {
@@ -70,6 +71,7 @@ func (s *SettingAAS) SetDefault() {
 	s.AASArrayType = LinearPhaseArray
 	s.CurveRadius = 0
 	s.CurveWidthInDegree = 0
+	s.GainDb = 0
 }
 
 func NewAAS() *SettingAAS {
@@ -437,7 +439,7 @@ func (s SettingAAS) ElementEffectiveGain(thetaH, thetaV float64) float64 {
 	// sumgain = 1.0 / sumgain
 	// sumgain = 1 / (sumgain ^ 2)
 	// ZZ(x, y) = 1 / min(sumgain, 1000)
-	return math.Max(sumgain, vlib.InvDb(-s.SLAV))
+	return math.Max(sumgain, vlib.InvDb(-s.SLAV)) * vlib.InvDb(s.GainDb)
 }
 
 func (s SettingAAS) ElementDirectionGain(theta float64) float64 {

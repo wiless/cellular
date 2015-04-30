@@ -73,8 +73,8 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss
 				// model.LossInDb3D(txnode.Location, rxnode.Location)
 				lossDb, _ := model.LossInDb3D(txnode.Location, rxnode.Location, f)
 				// log.Printf("frequency==%v lossDb is %v", f, lossDb)
-				aasgain, _, _ := antenna.AASGain(rxnode.Location)    /// linear scale
-				totalGainDb := vlib.Db(aasgain) + 18.0 + 23 - lossDb // Transmit power 35dB
+				aasgain, _, _ := antenna.AASGain(rxnode.Location)         /// linear scale
+				totalGainDb := vlib.Db(aasgain) + txnode.TxPower - lossDb // Transmit power 35dB
 				link.TxNodesRSRP.AppendAtEnd(totalGainDb)
 				// log.Println("AAS output CELL-DIRECTION gain,h,v", antenna.HTiltAngle, aasgain, thetah, thetav)
 

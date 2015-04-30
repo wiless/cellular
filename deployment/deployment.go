@@ -26,6 +26,7 @@ type Node struct {
 	Indoor      bool
 	Orientation vlib.VectorF
 	AntennaType int
+	TxPower     float64
 	FreqGHz     vlib.VectorF
 	Mode        TxRxMode `json:"TxRxMode"`
 }
@@ -72,6 +73,7 @@ type NodeType struct {
 	startID int
 	NodeIDs vlib.VectorI `json:",strings"`
 	Params  DropParameter
+	TxPower float64
 }
 
 type DropType int
@@ -238,6 +240,7 @@ func (d *DropSystem) NewNode(ntype string) *Node {
 	node.AntennaType = 0
 	node.Orientation = []float64{0, 0} /// Horizontal, Vertical orientation in degree
 	node.Mode = Inactive
+	node.TxPower = 1
 	if notype.Hmin == notype.Hmax {
 		node.Location.SetXY(0, 0)
 		node.Location.SetHeight(notype.Hmin)
@@ -346,6 +349,7 @@ func (d *DropSystem) Init() {
 
 		for i := 0; i < d.NodeTypes[indx].Count; i++ {
 			node := d.NewNode(d.NodeTypes[indx].Name)
+			node.TxPower = d.NodeTypes[indx].TxPower
 			d.Nodes[node.ID] = *node
 			d.NodeTypes[indx].NodeIDs[i] = node.ID
 		}

@@ -1,11 +1,14 @@
 package main
 
 import (
+	"encoding/csv"
 	"fmt"
 	"log"
 	"math"
 	"math/rand"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/wiless/cellular/pathloss"
@@ -27,7 +30,7 @@ var nSectors = 3
 var CellRadius = 250.0
 var nUEPerCell = 200
 var nCells = 7
-var CarriersGHz = vlib.VectorF{1.8}
+var CarriersGHz = vlib.VectorF{.4, .8, 1.8}
 
 func init() {
 
@@ -41,7 +44,7 @@ func init() {
 	defaultAAS.HTiltAngle = 0
 	defaultAAS.MfileName = "output.m"
 	defaultAAS.Omni = false
-
+	defaultAAS.GainDb = 18
 	defaultAAS.HoldOn = false
 	defaultAAS.AASArrayType = antenna.LinearPhaseArray
 	defaultAAS.CurveWidthInDegree = 30.0
@@ -63,6 +66,7 @@ func main() {
 
 	singlecell.SetAllNodeProperty("BS", "AntennaType", 0)
 	singlecell.SetAllNodeProperty("UE", "AntennaType", 1) /// Set All Pico to use antenna Type 1
+	// singlecell.SetAllNodeProperty("BS", "TxPower", vlib.InvDb(23))
 
 	singlecell.SetAllNodeProperty("BS", "FreqGHz", CarriersGHz) /// Set All Pico to use antenna Type 0
 	singlecell.SetAllNodeProperty("UE", "FreqGHz", CarriersGHz) /// Set All Pico to use antenna Type 0
@@ -91,6 +95,13 @@ func main() {
 	SINR := make(map[float64]vlib.VectorF)
 	log.Println("Total Freqs", SINR)
 	counter := 0
+	w, fer := os.Create("nodeinfo.dat")
+	if fer != nil {
+		log.Print("Error Creating CSV file ", fer)
+	}
+	cwr := csv.NewWriter(w)
+	// var record [4]string
+	w.WriteString("%NodeID,X,Y,SINR\n")
 	for _, metric := range MetricPerRx {
 
 		for f := 0; f < len(metric); f++ {
@@ -98,14 +109,18 @@ func main() {
 			temp := SINR[metric[f].FreqInGHz]
 			// temp.AppendAtEnd(metric[f].BestRSRP - (metric[f].N0))
 			temp.AppendAtEnd(metric[f].BestSINR)
-
+			loc := singlecell.Nodes[metric[f].RxNodeID].Location
+			record := strings.Split(fmt.Sprintf("%d\t%f\t%f\t%f", metric[f].RxNodeID, loc.X, loc.Y, metric[f].BestSINR), "\t")
 			SINR[metric[f].FreqInGHz] = temp
+			cwr.Write(record)
 			// if counter < 10 {
 			// 	fmt.Printf("\nrxid=%d indx %d Freq %f Value %v, %f", rxid, f, metric[f].FreqInGHz, metric[f].BestSINR, SINR[metric[f].FreqInGHz])
 			// }
 		}
 		counter++
 	}
+	cwr.Flush()
+	w.Close()
 	matlab.Close()
 	cnt := 0
 	matlab = vlib.NewMatlab("sinrVal.m")
@@ -119,7 +134,8 @@ func main() {
 		legendstring += str + " "
 		cnt++
 	}
-
+	matlab.Export("TxPower", singlecell.GetNodeType("BS").TxPower)
+	matlab.Export("AntennaGainDb", defaultAAS.GainDb)
 	matlab.Command(fmt.Sprintf("legend %v", legendstring))
 	matlab.Close()
 	fmt.Println("\n")
@@ -187,6 +203,7 @@ func DeployLayer1(system *deployment.DropSystem) {
 		templateAAS[i] = *antenna.NewAAS()
 		templateAAS[i] = defaultAAS
 		templateAAS[i].FreqHz = CarriersGHz[0] * 1.e9
+
 		// templateAAS[i].HBeamWidth = 65
 		templateAAS[i].HTiltAngle = secangles[vlib.ModInt(i, 3)]
 		if nSectors == 1 {
