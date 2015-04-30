@@ -27,9 +27,9 @@ var templateAAS []antenna.SettingAAS
 var singlecell deployment.DropSystem
 var secangles = vlib.VectorF{0.0, 120.0, -120.0}
 var nSectors = 3
-var CellRadius = 250.0
+var CellRadius = 500.0
 var nUEPerCell = 200
-var nCells = 7
+var nCells = 19
 var CarriersGHz = vlib.VectorF{.4, .8, 1.8}
 
 func init() {
@@ -101,7 +101,7 @@ func main() {
 	}
 	cwr := csv.NewWriter(w)
 	// var record [4]string
-	w.WriteString("%NodeID,X,Y,SINR\n")
+	w.WriteString("%NodeID,FreqHz,X,Y,SINR\n")
 	for _, metric := range MetricPerRx {
 
 		for f := 0; f < len(metric); f++ {
@@ -110,7 +110,7 @@ func main() {
 			// temp.AppendAtEnd(metric[f].BestRSRP - (metric[f].N0))
 			temp.AppendAtEnd(metric[f].BestSINR)
 			loc := singlecell.Nodes[metric[f].RxNodeID].Location
-			record := strings.Split(fmt.Sprintf("%d\t%f\t%f\t%f", metric[f].RxNodeID, loc.X, loc.Y, metric[f].BestSINR), "\t")
+			record := strings.Split(fmt.Sprintf("%d\t%f\t%f\t%f\t%f", metric[f].RxNodeID, metric[f].FreqInGHz, loc.X, loc.Y, metric[f].BestSINR), "\t")
 			SINR[metric[f].FreqInGHz] = temp
 			cwr.Write(record)
 			// if counter < 10 {
