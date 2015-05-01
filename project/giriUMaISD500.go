@@ -26,11 +26,11 @@ var templateAAS []antenna.SettingAAS
 
 var singlecell deployment.DropSystem
 var secangles = vlib.VectorF{0.0, 120.0, -120.0}
-var nSectors = 3
-var CellRadius = 500.0
-var nUEPerCell = 200
-var nCells = 19
-var CarriersGHz = vlib.VectorF{.4, .8, 1.8}
+var nSectors = 1
+var CellRadius = 350.0
+var nUEPerCell = 550
+var nCells = 1
+var CarriersGHz = vlib.VectorF{.4, .8, 1.9}
 
 func init() {
 
@@ -43,8 +43,8 @@ func init() {
 	defaultAAS.ESpacingVFactor = .5
 	defaultAAS.HTiltAngle = 0
 	defaultAAS.MfileName = "output.m"
-	defaultAAS.Omni = false
-	defaultAAS.GainDb = 18
+	defaultAAS.Omni = true
+	defaultAAS.GainDb = 10
 	defaultAAS.HoldOn = false
 	defaultAAS.AASArrayType = antenna.LinearPhaseArray
 	defaultAAS.CurveWidthInDegree = 30.0
@@ -89,7 +89,7 @@ func main() {
 		MetricPerRx[rxid] = metrics
 	}
 	// vlib.SaveMapStructure2(MetricPerRx, "linkmetric.json", "UE", "LinkMetric", true)
-	// vlib.SaveStructure(AllMetrics, "linkmetric2.json", true)
+	vlib.SaveStructure(AllMetrics, "linkmetric2.json", true)
 
 	//Generate SINR values for CDF
 	SINR := make(map[float64]vlib.VectorF)
@@ -101,7 +101,8 @@ func main() {
 	}
 	cwr := csv.NewWriter(w)
 	// var record [4]string
-	w.WriteString("%NodeID,FreqHz,X,Y,SINR\n")
+	cwr.Comma = '\t'
+	w.WriteString("%NodeID\tFreqHz\tX\tY\tSINR\n")
 	for _, metric := range MetricPerRx {
 
 		for f := 0; f < len(metric); f++ {
@@ -151,12 +152,8 @@ func DeployLayer1(system *deployment.DropSystem) {
 
 	AreaRadius := CellRadius
 
-	// templateAAS = antenna.NewAAS()
-	// templateAAS.SetDefault()
-	// templateAAS.Omni = true
-
 	setting.SetCoverage(deployment.CircularCoverage(AreaRadius))
-	setting.AddNodeType(deployment.NodeType{Name: "BS", Hmin: 30.0, Hmax: 30.0, Count: nCells * nSectors})
+	setting.AddNodeType(deployment.NodeType{Name: "BS", TxPower: vlib.InvDb(30), Hmin: 30.0, Hmax: 30.0, Count: nCells * nSectors})
 	setting.AddNodeType(deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 1.1, Count: nUEPerCell * nCells})
 
 	// setting.AddNodeType(waptype)

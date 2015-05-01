@@ -7,19 +7,23 @@ figure
 sinr=nodeinfoTable(:,5);
 cmap=colormap;
 LEVELS=length(cmap);
-minsinr=min(sinr);
-maxsinr=max(sinr);
+minsinr=-10;
+maxsinr=20;
 sinrrange=(maxsinr-minsinr);
-% cedges=[0:LEVELS-1]*sinrrange/LEVELS+(minsinr);
+cedges=[0:LEVELS-1]*sinrrange/LEVELS+(minsinr);
 
-% clevel=quantiz(sinr,cedges);
+clevel=quantiz(sinr,cedges);
 
 N=length(nodeinfoTable);
  	deltasize=80/14;
 	S=80*ones(N,1);
-    
-
-scatter3(nodeinfoTable(:,3),nodeinfoTable(:,4),nodeinfoTable(:,5),S,floor(sinr/(sinrrange/LEVELS)),'filled')
+sinrrange
+LEVELS
+delta = (sinrrange/LEVELS)
+C=floor(sinr/delta);
+C=cedges(clevel);
+scatter3(nodeinfoTable(:,3),nodeinfoTable(:,4),nodeinfoTable(:,5),S,C,'filled')
 colorbar
 view(2)
+title(f)
 end
