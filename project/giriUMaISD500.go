@@ -26,10 +26,10 @@ var templateAAS []antenna.SettingAAS
 
 var singlecell deployment.DropSystem
 var secangles = vlib.VectorF{0.0, 120.0, -120.0}
-var nSectors = 1
-var CellRadius = 350.0
+var nSectors = 3
+var CellRadius = 250.0
 var nUEPerCell = 550
-var nCells = 1
+var nCells = 19
 var CarriersGHz = vlib.VectorF{.4, .8, 1.9}
 
 func init() {
@@ -62,6 +62,7 @@ func main() {
 	rand.Seed(seedvalue)
 
 	var hatamodel pathloss.OkumuraHata
+
 	DeployLayer1(&singlecell)
 
 	singlecell.SetAllNodeProperty("BS", "AntennaType", 0)
@@ -80,6 +81,7 @@ func main() {
 	MaxCarriers := 1
 	for _, rxid := range rxids {
 		metrics := wsystem.EvaluteMetric(&singlecell, &hatamodel, rxid, myfunc)
+
 		if len(metrics) > 1 {
 			// log.Printf("%s[%d] Supports %d Carriers", "UE", rxid, len(metrics))
 			MaxCarriers = int(math.Max(float64(MaxCarriers), float64(len(metrics))))
@@ -153,7 +155,7 @@ func DeployLayer1(system *deployment.DropSystem) {
 	AreaRadius := CellRadius
 
 	setting.SetCoverage(deployment.CircularCoverage(AreaRadius))
-	setting.AddNodeType(deployment.NodeType{Name: "BS", TxPower: vlib.InvDb(30), Hmin: 30.0, Hmax: 30.0, Count: nCells * nSectors})
+	setting.AddNodeType(deployment.NodeType{Name: "BS", TxPower: vlib.InvDb(10), Hmin: 30.0, Hmax: 30.0, Count: nCells * nSectors})
 	setting.AddNodeType(deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 1.1, Count: nUEPerCell * nCells})
 
 	// setting.AddNodeType(waptype)
