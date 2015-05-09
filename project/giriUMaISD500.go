@@ -29,8 +29,8 @@ var secangles = vlib.VectorF{0.0, 120.0, -120.0}
 var nSectors = 3
 var CellRadius = 250.0
 var nUEPerCell = 550
-var nCells = 19
-var CarriersGHz = vlib.VectorF{.4, .8, 1.9}
+var nCells = 1
+var CarriersGHz = vlib.VectorF{1.8}
 
 func init() {
 

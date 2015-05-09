@@ -1,10 +1,12 @@
 load nodeinfo.dat % NodeID,X,Y,SINR
+%nodeinfo =nodeinfo(find(mod(nodeinfo(:,7),2)==0),:);
 frequency= unique(nodeinfo(:,2))';
 for f=frequency
 nodeinfoTable=nodeinfo(find(nodeinfo(:,2)==f),:);
 
 figure
-sinr=nodeinfoTable(:,5);
+col=5
+sinr=nodeinfoTable(:,col);
 cmap=colormap;
 LEVELS=length(cmap);
 minsinr=-10;
@@ -22,7 +24,7 @@ LEVELS
 delta = (sinrrange/LEVELS)
 C=floor(sinr/delta);
 C=cedges(clevel);
-scatter3(nodeinfoTable(:,3),nodeinfoTable(:,4),nodeinfoTable(:,5),S,C,'filled')
+scatter3(nodeinfoTable(:,3),nodeinfoTable(:,4),nodeinfoTable(:,col),S,C,'filled')
 colorbar
 view(2)
 title(f)

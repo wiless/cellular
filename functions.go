@@ -1,7 +1,6 @@
 package cellular
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/wiless/cellular/antenna"
@@ -43,7 +42,7 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss
 	for i := 0; i < len(txnodeTypes); i++ {
 		alltxNodeIds.AppendAtEnd(singlecell.GetNodeIDs(txnodeTypes[i])...)
 	}
-
+	// fmt.Println("All txnodes are  : ", alltxNodeIds)
 	for _, f := range rxnode.FreqGHz {
 		var link LinkMetric
 
@@ -54,15 +53,17 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss
 		link.N0 = N0
 		link.BandwidthMHz = BandwidthMHz
 		// model.SetFreqHz = f * 1e9
-
+		link.TxNodeIDs.Resize(0)
 		nlinks := 0
 		for _, val := range alltxNodeIds {
 			txnodeID := val
 			txnode := singlecell.Nodes[val]
 
 			if found, _ := vlib.Contains(txnode.FreqGHz, f); found {
+
 				nlinks++
 				link.TxNodeIDs.AppendAtEnd(txnodeID)
+
 				antenna := afn(txnodeID)
 				antenna.FreqHz = f * 1.0e9
 				// log.Println(txnode.Orientation)
@@ -80,7 +81,7 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss
 				// log.Println("AAS output CELL-DIRECTION gain,h,v", antenna.HTiltAngle, aasgain, thetah, thetav)
 
 				// log.Printf("%s[%d] : TxNode %d : Link @ %3.2fGHz  : %-4.3fdB , AntennaGain = %3.2fdB", rxnode.Type, rxid, val, f, totalGainDb, vlib.Db(aasgain))
-
+				// log.Printf("%v", link.TxNodeIDs)
 			} else {
 				log.Printf("%s[%d] : TxNode %d : No Link on %3.2fGHz", rxnode.Type, rxid, val, f)
 
@@ -95,7 +96,7 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss
 			rsrpLinr := vlib.InvDbF(link.TxNodesRSRP)
 			totalrssi := vlib.Sum(rsrpLinr) + vlib.InvDb(link.N0)
 			maxrsrp := vlib.Max(rsrpLinr)
-			fmt.Println("\n  vlib.Sum(rsrpLinr), vlib.InvDb(link.N0) ", vlib.Db(vlib.Sum(rsrpLinr)), (link.N0))
+			//fmt.Println("\n  vlib.Sum(rsrpLinr), vlib.InvDb(link.N0) ", vlib.Db(vlib.Sum(rsrpLinr)), (link.N0))
 			// if nlinks == 1 {
 			// 	link.BestSINR = vlib.Db(maxrsrp) - N0
 			// 	// +1000 /// s/i = MAX value
@@ -111,17 +112,29 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss
 			}
 
 			// }
-			fmt.Println("\n  maxrsrp / (totalrssi - maxrsrp) ", vlib.Db(maxrsrp), link.BestSINR)
-			val, sindx := vlib.Sorted(link.TxNodesRSRP)
+			//fmt.Println("\n  maxrsrp / (totalrssi - maxrsrp) ", vlib.Db(maxrsrp), link.BestSINR)
+			//val, sindx := vlib.Sorted(link.TxNodesRSRP)
+			//fmt.Println("The SINDX %v ", sindx)
+			//fmt.Println("Sorted TxNodes & Values : ", link.TxNodeIDs, link.TxNodesRSRP)
+			//link.TxNodesRSRP = val
+			//tmp := vlib.NewVectorI(link.TxNodeIDs.Size())
+			/*for k:0;k<length(tmp);k++{
+			tmp[k] = link.TxNodeIDs.At(sindx)
 
-			// fmt.Println("Sorted TxNodes & Values : ", link.TxNodeIDs, link.TxNodesRSRP)
-			link.TxNodesRSRP = val
-			link.TxNodeIDs = link.TxNodeIDs.At(sindx)
-			// fmt.Println("Sorted TxNodes & Values : ", link.TxNodeIDs, link.TxNodesRSRP)
+			}*/
+			//fmt.Println("Sorted TxNodes & Values : ", link.TxNodeIDs, link.TxNodesRSRP)
 
 			link.RSSI = vlib.Db(totalrssi)
-			link.BestRSRP = vlib.Db(maxrsrp)
-			link.BestRSRPNode = link.TxNodeIDs[0]
+			link.BestRSRP = vlib.Max(link.TxNodesRSRP)
+			link.BestRSRPNode = -1
+			for i := 0; i < link.TxNodesRSRP.Len(); i++ {
+				if link.TxNodesRSRP[i] == link.BestRSRP {
+					link.BestRSRPNode = link.TxNodeIDs[i]
+				}
+
+			}
+
+			//link.BestRSRPNode =   link.TxNodeIDs.
 			PerFreqLink[f] = link
 		}
 
