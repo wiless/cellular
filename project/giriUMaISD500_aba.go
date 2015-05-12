@@ -72,7 +72,7 @@ func main() {
 
 	singlecell.SetAllNodeProperty("BS", "AntennaType", 0)
 	singlecell.SetAllNodeProperty("UE", "AntennaType", 1) /// Set All Pico to use antenna Type 1
-	singlecell.SetAllNodeProperty("BS", "TxPower", vlib.InvDb(23))
+	singlecell.SetAllNodeProperty("BS", "TxPower", vlib.InvDb(21))
 
 	singlecell.SetAllNodeProperty("BS", "FreqGHz", CarriersGHz) /// Set All Pico to use antenna Type 0
 	singlecell.SetAllNodeProperty("UE", "FreqGHz", CarriersGHz) /// Set All Pico to use antenna Type 0

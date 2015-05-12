@@ -5,12 +5,12 @@ for f=frequency
 nodeinfoTable=nodeinfo(find(nodeinfo(:,2)==f),:);
 
 figure
-col=5
+col=6
 sinr=nodeinfoTable(:,col);
 cmap=colormap;
 LEVELS=length(cmap);
-minsinr=-10;
-maxsinr=20;
+minsinr=-32;
+maxsinr=50;
 sinrrange=(maxsinr-minsinr);
 cedges=[0:LEVELS-1]*sinrrange/LEVELS+(minsinr);
 
@@ -25,6 +25,7 @@ delta = (sinrrange/LEVELS)
 C=floor(sinr/delta);
 C=cedges(clevel);
 scatter3(nodeinfoTable(:,3),nodeinfoTable(:,4),nodeinfoTable(:,col),S,C,'filled')
+
 colorbar
 view(2)
 title(f)
