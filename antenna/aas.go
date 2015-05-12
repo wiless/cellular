@@ -30,6 +30,8 @@ var Bobwriter io.Writer
 // var VBeamWidth, HBeamWidth float64 = 65, 65
 
 type SettingAAS struct {
+	UID                              string `datastore:"-" json:"uid"`
+	NodeID                           int    // Associated Node ID where relevant
 	elementLocations                 []vlib.Location3D
 	lamda                            float64
 	FreqHz                           float64
@@ -212,14 +214,51 @@ func (params *SettingAAS) GetRxPhase(dest vlib.Location3D) []complex128 {
 	return result
 }
 
+// AASGain2 returns the AAS gain for the given azimuth and elevation angle (degrees), gain in dB
+func (params *SettingAAS) AASGain2(thetaH, thetaV float64) (gaindB float64) {
+	// src := params.MyLocation()
+
+	params.lamda = cspeed / params.FreqHz
+	AntennaElementLocations := vlib.Location3DtoVecC(params.elementLocations)
+
+	w := params.weightVector //params.FindWeights(params.BeamTilt)
+	if params.DisableBeamTit {
+		w = vlib.NewOnesC(AntennaElementLocations.Size())
+		// fmt.Printf("Disable Beam tilt")
+	}
+	w = w.Scale(math.Sqrt(1.0 / float64(params.N)))
+	phaseDelay := vlib.NewVectorF(AntennaElementLocations.Size())
+	var Rxcomponent complex128
+	Rxcomponent = 0.0
+	dist := 10.0
+	// fmt.Printf("\n Weights : %v", w)
+	for i := 0; i < params.N; i++ {
+		// dist, thetaH, thetaV := vlib.RelativeGeo(params.elementLocations[i], dest)
+		// dist= cmplx.Abs(params.elementLocations[i].Cmplx()-dest.Cmplx())
+		aGain := complex((params.ElementEffectiveGain(thetaH, thetaV)), 0)
+		_, phaseDelay[i] = (math.Modf(2 * math.Pi * dist / params.lamda))
+		Rxcomponent += GetEJtheta(vlib.ToDegree(phaseDelay[i])) * w[i] * aGain
+	}
+	gaindB = vlib.Db(math.Pow(cmplx.Abs(Rxcomponent), 2)) + params.GainDb
+
+	return gaindB
+
+}
+
 func (params *SettingAAS) AASGain(dest vlib.Location3D) (gain float64, effectiveThetaH, effectiveThetaV float64) {
 	// src := params.MyLocation()
 
 	params.lamda = cspeed / params.FreqHz
 	AntennaElementLocations := vlib.Location3DtoVecC(params.elementLocations)
 
-	w := vlib.NewOnesC(params.N)
-	w = w.Scale(1.0 / float64(params.N))
+	// w =
+
+	w := params.weightVector //params.FindWeights(params.BeamTilt)
+	if params.DisableBeamTit {
+		w = vlib.NewOnesC(AntennaElementLocations.Size())
+	}
+	w = w.Scale(math.Sqrt(1.0 / float64(params.N)))
+
 	// fmt.Print(AntennaElementLocations)
 	phaseDelay := vlib.NewVectorF(AntennaElementLocations.Size())
 	var Rxcomponent complex128

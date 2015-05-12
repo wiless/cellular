@@ -1,7 +1,6 @@
 package cellular
 
 import (
-	"fmt"
 	"log"
 
 	"github.com/wiless/cellular/antenna"
@@ -95,7 +94,7 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss
 			rsrpLinr := vlib.InvDbF(link.TxNodesRSRP)
 			totalrssi := vlib.Sum(rsrpLinr) + vlib.InvDb(link.N0)
 			maxrsrp := vlib.Max(rsrpLinr)
-			fmt.Println("\n  vlib.Sum(rsrpLinr), vlib.InvDb(link.N0) ", vlib.Db(vlib.Sum(rsrpLinr)), (link.N0))
+			// fmt.Println("\n  vlib.Sum(rsrpLinr), vlib.InvDb(link.N0) ", vlib.Db(vlib.Sum(rsrpLinr)), (link.N0))
 			// if nlinks == 1 {
 			// 	link.BestSINR = vlib.Db(maxrsrp) - N0
 			// 	// +1000 /// s/i = MAX value
@@ -111,7 +110,7 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss
 			}
 
 			// }
-			fmt.Println("\n  maxrsrp / (totalrssi - maxrsrp) ", vlib.Db(maxrsrp), link.BestSINR)
+			// fmt.Println("\n  maxrsrp / (totalrssi - maxrsrp) ", vlib.Db(maxrsrp), link.BestSINR)
 			val, sindx := vlib.Sorted(link.TxNodesRSRP)
 
 			// fmt.Println("Sorted TxNodes & Values : ", link.TxNodeIDs, link.TxNodesRSRP)

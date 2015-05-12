@@ -633,6 +633,7 @@ func HexGrid(N int, center vlib.Location3D, hexsize float64, RDEGREE float64) []
 		cube := directions[4+ROTATE].Scale3D(radius)
 		for i := 0; i < 6; i++ {
 			for j := 0; j < r; j++ {
+
 				x := hexsize * 1.7320508 * (cube.X + cube.Z*0.5) // sqrt(3)=1.7320508
 				y := hexsize * 1.5 * cube.Z
 				result[n].X, result[n].Y = y, x

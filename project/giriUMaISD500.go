@@ -7,7 +7,6 @@ import (
 	"math"
 	"math/rand"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -29,8 +28,8 @@ var secangles = vlib.VectorF{0.0, 120.0, -120.0}
 var nSectors = 3
 var CellRadius = 250.0
 var nUEPerCell = 550
-var nCells = 19
-var CarriersGHz = vlib.VectorF{.4, .8, 1.9}
+var nCells = 1
+var CarriersGHz = vlib.VectorF{.8}
 
 func init() {
 
@@ -39,7 +38,8 @@ func init() {
 	defaultAAS.FreqHz = CarriersGHz[0]
 	defaultAAS.BeamTilt = 0
 	defaultAAS.DisableBeamTit = false
-	defaultAAS.VTiltAngle = 30
+	// defaultAAS.VTiltAngle = 0   /// changed for each BS
+	// defaultAAS.VBeamWidth = 65 /// Common for all BS
 	defaultAAS.ESpacingVFactor = .5
 	defaultAAS.HTiltAngle = 0
 	defaultAAS.MfileName = "output.m"
@@ -205,6 +205,8 @@ func DeployLayer1(system *deployment.DropSystem) {
 
 		// templateAAS[i].HBeamWidth = 65
 		templateAAS[i].HTiltAngle = secangles[vlib.ModInt(i, 3)]
+		templateAAS[i].VTiltAngle = 30
+
 		if nSectors == 1 {
 			templateAAS[i].Omni = true
 		} else {
@@ -212,20 +214,6 @@ func DeployLayer1(system *deployment.DropSystem) {
 		}
 		templateAAS[i].CreateElements(system.Nodes[bsids[i]].Location)
 
-		hgain := vlib.NewVectorF(360)
-		cnt := 0
-		cmd := `delta=pi/180;
-phaseangle=0:delta:2*pi-delta;`
-		matlab.Command(cmd)
-		for d := 0; d < 360; d++ {
-			hgain[cnt] = templateAAS[i].ElementDirectionHGain(float64(d))
-			cnt++
-		}
-
-		matlab.Export("gain"+strconv.Itoa(i), hgain)
-
-		cmd = fmt.Sprintf("polar(phaseangle,gain%d);hold all", i)
-		matlab.Command(cmd)
 	}
 	vlib.SaveStructure(templateAAS, "antennaArray.json")
 	vlib.SaveStructure(system, "dep.json", true)

@@ -65,16 +65,13 @@ func main() {
 	// matlab.Export("Lamda", params.lamda)
 
 	matlab.Command("\nangles=;")
-	matlab.Command("polar(angle(pattern),abs(pattern),'k-')")
+	matlab.Command("polar(angle(hpattern),abs(hpattern),'k-')")
+	matlab.Command("polar(angle(vpattern),abs(vpattern),'k-')")
 
 	matlab.Close()
 
 	// vcell1.ElementEffectiveGain(thetaH, 0)
 
 	// antenna.RunAAS(setting)
-
-}
-
-func Radians(d float64) (radian float64) {
 
 }
