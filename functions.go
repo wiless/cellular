@@ -74,15 +74,10 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss
 				//txnode.Location.Z = txnode.Height
 				// model.LossInDb3D(txnode.Location, rxnode.Location)
 				lossDb, _ := model.LossInDb3D(txnode.Location, rxnode.Location, f)
-				// log.Printf("frequency==%v lossDb is %v", f, lossDb)
-				aasgain, _, _ := antenna.AASGain(rxnode.Location)                  /// linear scale
-				totalGainDb := vlib.Db(aasgain) + vlib.Db(txnode.TxPower) - lossDb // Transmit power 35dB
-				// log.Printf("(RSRP = %f) rxid, %d: Antenna %f =  %f +TxPower %f ,loss %f", totalGainDb, rxid, aasgain, vlib.Db(aasgain), vlib.Db(txnode.TxPower), lossDb)
-				link.TxNodesRSRP.AppendAtEnd(totalGainDb)
-				// log.Println("AAS output CELL-DIRECTION gain,h,v", antenna.HTiltAngle, aasgain, thetah, thetav)
+				aasgain, _, _ := antenna.AASGain(rxnode.Location)
+				rxRSRP := vlib.Db(aasgain) + txnode.TxPowerDBm - lossDb
+				link.TxNodesRSRP.AppendAtEnd(rxRSRP)
 
-				// log.Printf("%s[%d] : TxNode %d : Link @ %3.2fGHz  : %-4.3fdB , AntennaGain = %3.2fdB", rxnode.Type, rxid, val, f, totalGainDb, vlib.Db(aasgain))
-				// log.Printf("%v", link.TxNodeIDs)
 			} else {
 				log.Printf("%s[%d] : TxNode %d : No Link on %3.2fGHz", rxnode.Type, rxid, val, f)
 
@@ -93,7 +88,6 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss
 		if nlinks > 0 {
 			link.N0 = N0
 			link.BandwidthMHz = BandwidthMHz
-
 			rsrpLinr := vlib.InvDbF(link.TxNodesRSRP)
 			totalrssi := vlib.Sum(rsrpLinr) + vlib.InvDb(link.N0)
 			maxrsrp := vlib.Max(rsrpLinr)
@@ -112,30 +106,14 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss
 				link.BestSINR = vlib.Db(maxrsrp) - vlib.Db(totalrssi-maxrsrp)
 			}
 
-			// }
-			//fmt.Println("\n  maxrsrp / (totalrssi - maxrsrp) ", vlib.Db(maxrsrp), link.BestSINR)
-			//val, sindx := vlib.Sorted(link.TxNodesRSRP)
-			//fmt.Println("The SINDX %v ", sindx)
-			//fmt.Println("Sorted TxNodes & Values : ", link.TxNodeIDs, link.TxNodesRSRP)
-			//link.TxNodesRSRP = val
-			//tmp := vlib.NewVectorI(link.TxNodeIDs.Size())
-			/*for k:0;k<length(tmp);k++{
-			tmp[k] = link.TxNodeIDs.At(sindx)
-
-			}*/
-			//fmt.Println("Sorted TxNodes & Values : ", link.TxNodeIDs, link.TxNodesRSRP)
-
 			link.RSSI = vlib.Db(totalrssi)
-			link.BestRSRP = vlib.Max(link.TxNodesRSRP)
-			link.BestRSRPNode = -1
-			for i := 0; i < link.TxNodesRSRP.Len(); i++ {
-				if link.TxNodesRSRP[i] == link.BestRSRP {
-					link.BestRSRPNode = link.TxNodeIDs[i]
-				}
 
-			}
+			sortedRxrp, indx := link.TxNodesRSRP.Sorted2()
+			link.TxNodeIDs = link.TxNodeIDs.At(indx.Flip()...) // Sort it
+			link.TxNodesRSRP = sortedRxrp.Flip()
+			link.BestRSRP = link.TxNodesRSRP[0]
+			link.BestRSRPNode = link.TxNodeIDs[0]
 
-			//link.BestRSRPNode =   link.TxNodeIDs.
 			PerFreqLink[f] = link
 		}
 

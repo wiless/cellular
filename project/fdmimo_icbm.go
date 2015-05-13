@@ -31,12 +31,11 @@ var hsecangles = vlib.VectorF{0.0, 0.0, 120.0, 120.0, -120.0, -120.0}
 var vsecangles = vlib.VectorF{0, 35, 0, 35, 0, 35}
 var nSectors = 3 * 2
 var CellRadius = 250.0
-var nUEPerCell = 20000
-var nCells = 1
+var nUEPerCell = 360
+var nCells = 7
 var CarriersGHz = vlib.VectorF{1.8}
 
 func init() {
-
 	defaultAAS.SetDefault()
 	defaultAAS.N = 1
 	defaultAAS.FreqHz = CarriersGHz[0]
@@ -93,29 +92,18 @@ func main() {
 			// fmt.Println("Rx", link.RxNodeID)
 			// fmt.Println(indx, "txnodes", link.TxNodeIDs)
 			// fmt.Println(indx, "txrssi", link.TxNodesRSRP)
-			bestnode := link.BestRSRPNode
-			var idx int
-			switch bestnode {
-			case 0:
-				idx = link.TxNodeIDs.Find(1)
-				break
-			case 1:
-				idx = link.TxNodeIDs.Find(0)
-				break
-			case 2:
-				idx = link.TxNodeIDs.Find(3)
-				break
-			case 3:
-				idx = link.TxNodeIDs.Find(2)
-				break
-			case 4:
-				idx = link.TxNodeIDs.Find(5)
-				break
-			case 5:
-				idx = link.TxNodeIDs.Find(4)
-				break
-			}
 
+			bestnode := link.BestRSRPNode
+
+			vsectorID := vlib.ModInt(bestnode, 2) // 0 ==> Top beam, 1=> bottom beam
+			var interfnode int
+			if vsectorID == 0 {
+				interfnode = bestnode + 1
+			} else {
+				interfnode = bestnode - 1
+			}
+			fmt.Println("Source, Interference : ", bestnode, interfnode, vsectorID)
+			idx := link.TxNodeIDs.Find(interfnode)
 			intrssi := link.TxNodesRSRP[idx]
 			sir := link.BestRSRP - intrssi
 			link.RoIDbm = sir
@@ -168,6 +156,7 @@ func main() {
 	matlab.Close()
 	cnt := 0
 	matlab = vlib.NewMatlab("sinrVal.m")
+	matlab.Command("figure")
 	legendstring := ""
 	for f, sinr := range SINR {
 		log.Printf("\n F%d=%f \nSINR%d= %v", cnt, f, cnt, len(sinr))
@@ -196,7 +185,7 @@ func DeployLayer1(system *deployment.DropSystem) {
 	AreaRadius := CellRadius
 
 	setting.SetCoverage(deployment.CircularCoverage(AreaRadius))
-	setting.AddNodeType(deployment.NodeType{Name: "BS", TxPower: vlib.InvDb(10), Hmin: 30.0, Hmax: 30.0, Count: nCells * nSectors})
+	setting.AddNodeType(deployment.NodeType{Name: "BS", TxPowerDBm: 10, Hmin: 30.0, Hmax: 30.0, Count: nCells * nSectors})
 	setting.AddNodeType(deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 10.1, Count: nUEPerCell * nCells})
 
 	// setting.AddNodeType(waptype)

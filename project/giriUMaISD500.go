@@ -155,7 +155,7 @@ func DeployLayer1(system *deployment.DropSystem) {
 	AreaRadius := CellRadius
 
 	setting.SetCoverage(deployment.CircularCoverage(AreaRadius))
-	setting.AddNodeType(deployment.NodeType{Name: "BS", TxPower: vlib.InvDb(10), Hmin: 30.0, Hmax: 30.0, Count: nCells * nSectors})
+	setting.AddNodeType(deployment.NodeType{Name: "BS", TxPowerDBm: 10, Hmin: 30.0, Hmax: 30.0, Count: nCells * nSectors})
 	setting.AddNodeType(deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 1.1, Count: nUEPerCell * nCells})
 
 	// setting.AddNodeType(waptype)
