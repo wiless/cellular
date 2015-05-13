@@ -137,7 +137,7 @@ func main() {
 		legendstring += str + " "
 		cnt++
 	}
-	matlab.Export("TxPower", singlecell.GetNodeType("BS").TxPower)
+	matlab.Export("TxPower", singlecell.GetNodeType("BS").TxPowerDBm)
 	matlab.Export("AntennaGainDb", defaultAAS.GainDb)
 	matlab.Command(fmt.Sprintf("legend %v", legendstring))
 	matlab.Close()

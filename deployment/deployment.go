@@ -66,14 +66,14 @@ func (d DropParameter) MarshalJSON() ([]byte, error) {
 }
 
 type NodeType struct {
-	Name    string
-	Hmin    float64
-	Hmax    float64
-	Count   int
-	startID int
-	NodeIDs vlib.VectorI `json:",strings"`
-	Params  DropParameter
-	TxPower float64
+	Name       string
+	Hmin       float64
+	Hmax       float64
+	Count      int
+	startID    int
+	NodeIDs    vlib.VectorI `json:",strings"`
+	Params     DropParameter
+	TxPowerDBm float64
 }
 
 type DropType int
@@ -349,7 +349,7 @@ func (d *DropSystem) Init() {
 
 		for i := 0; i < d.NodeTypes[indx].Count; i++ {
 			node := d.NewNode(d.NodeTypes[indx].Name)
-			node.TxPowerDBm = d.NodeTypes[indx].TxPower
+			node.TxPowerDBm = d.NodeTypes[indx].TxPowerDBm
 			d.Nodes[node.ID] = *node
 			d.NodeTypes[indx].NodeIDs[i] = node.ID
 		}

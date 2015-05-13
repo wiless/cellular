@@ -71,7 +71,7 @@ func main() {
 
 	singlecell.SetAllNodeProperty("BS", "AntennaType", 0)
 	singlecell.SetAllNodeProperty("UE", "AntennaType", 1) /// Set All Pico to use antenna Type 1
-	singlecell.SetAllNodeProperty("BS", "TxPower", vlib.InvDb(21))
+	singlecell.SetAllNodeProperty("BS", "TxPowerDBm", 23)
 
 	singlecell.SetAllNodeProperty("BS", "FreqGHz", CarriersGHz) /// Set All Pico to use antenna Type 0
 	singlecell.SetAllNodeProperty("UE", "FreqGHz", CarriersGHz) /// Set All Pico to use antenna Type 0
@@ -167,7 +167,7 @@ func main() {
 		legendstring += str + " "
 		cnt++
 	}
-	matlab.Export("TxPower", singlecell.GetNodeType("BS").TxPower)
+	matlab.Export("TxPower", singlecell.GetNodeType("BS").TxPowerDBm)
 	matlab.Export("AntennaGainDb", defaultAAS.GainDb)
 	matlab.Command(fmt.Sprintf("legend %v", legendstring))
 	matlab.Close()
@@ -185,7 +185,7 @@ func DeployLayer1(system *deployment.DropSystem) {
 	AreaRadius := CellRadius
 
 	setting.SetCoverage(deployment.CircularCoverage(AreaRadius))
-	setting.AddNodeType(deployment.NodeType{Name: "BS", TxPowerDBm: 10, Hmin: 30.0, Hmax: 30.0, Count: nCells * nSectors})
+	setting.AddNodeType(deployment.NodeType{Name: "BS", TxPowerDBm: 23, Hmin: 30.0, Hmax: 30.0, Count: nCells * nSectors})
 	setting.AddNodeType(deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 10.1, Count: nUEPerCell * nCells})
 
 	// setting.AddNodeType(waptype)
