@@ -6,7 +6,7 @@ for f=frequency
 nodeinfoTable=nodeinfo(find(nodeinfo(:,2)==f),:);
 
 figure
-col=6
+col=5
 sinr=nodeinfoTable(:,col);
 cmap=colormap;
 LEVELS=length(cmap);

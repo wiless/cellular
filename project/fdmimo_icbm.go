@@ -31,8 +31,8 @@ var hsecangles = vlib.VectorF{0.0, 0.0, 120.0, 120.0, -120.0, -120.0}
 var vsecangles = vlib.VectorF{0, 35, 0, 35, 0, 35}
 var nSectors = 3 * 2
 var CellRadius = 250.0
-var nUEPerCell = 360
-var nCells = 7
+var nUEPerCell = 700
+var nCells = 19
 var CarriersGHz = vlib.VectorF{1.8}
 
 func init() {
@@ -45,7 +45,7 @@ func init() {
 	defaultAAS.ESpacingVFactor = .5
 	defaultAAS.HTiltAngle = 0
 	defaultAAS.VBeamWidth = 30
-	defaultAAS.HBeamWidth = 40
+	defaultAAS.HBeamWidth = 65
 	defaultAAS.MfileName = "output.m"
 	defaultAAS.Omni = true
 	defaultAAS.GainDb = 8
@@ -71,7 +71,7 @@ func main() {
 
 	singlecell.SetAllNodeProperty("BS", "AntennaType", 0)
 	singlecell.SetAllNodeProperty("UE", "AntennaType", 1) /// Set All Pico to use antenna Type 1
-	singlecell.SetAllNodeProperty("BS", "TxPowerDBm", 23)
+	singlecell.SetAllNodeProperty("BS", "TxPowerDBm", 23.0)
 
 	singlecell.SetAllNodeProperty("BS", "FreqGHz", CarriersGHz) /// Set All Pico to use antenna Type 0
 	singlecell.SetAllNodeProperty("UE", "FreqGHz", CarriersGHz) /// Set All Pico to use antenna Type 0
