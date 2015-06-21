@@ -79,12 +79,24 @@ func NewAAS() *SettingAAS {
 	result.SetDefault()
 	return result
 }
+
 func (s *SettingAAS) Set(str string) {
 	err := json.Unmarshal([]byte(str), s)
 	if err != nil {
 		log.Print("Error ", err)
 	}
 }
+
+func (s *SettingAAS) Get() string {
+
+	bytes, err := json.Marshal(s)
+	if err != nil {
+		return ""
+	} else {
+		return string(bytes)
+	}
+}
+
 func init() {
 
 	// flag.Float64Var(&freq, "fc", 2.0e9, "Carrier Frequency in Hz (not GHz)")

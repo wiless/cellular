@@ -4,9 +4,9 @@ import (
 	"encoding/csv"
 	"fmt"
 	"log"
-	"math"
 	"math/rand"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -22,7 +22,7 @@ import (
 
 var matlab *vlib.Matlab
 var defaultAAS antenna.SettingAAS
-var templateAAS []antenna.SettingAAS
+var templateAAS map[int]*antenna.SettingAAS
 
 var singlecell deployment.DropSystem
 var secangles = vlib.VectorF{0.0, 120.0, -120.0}
@@ -36,7 +36,7 @@ func init() {
 
 	defaultAAS.SetDefault()
 	defaultAAS.N = 1
-	defaultAAS.FreqHz = CarriersGHz[0]
+	defaultAAS.FreqHz = 3.4 // CarriersGHz[0]
 	defaultAAS.BeamTilt = 0
 	defaultAAS.DisableBeamTit = false
 	defaultAAS.VTiltAngle = 30
@@ -73,30 +73,30 @@ func main() {
 	singlecell.SetAllNodeProperty("UE", "FreqGHz", CarriersGHz) /// Set All Pico to use antenna Type 0
 
 	rxids := singlecell.GetNodeIDs("UE")
-	type MFNMetric []cell.LinkMetric
-	MetricPerRx := make(map[int]MFNMetric)
-	var AllMetrics MFNMetric
+
+	AllRxMetrics := make(map[int]cell.LinkMetric)
+
 	wsystem := cell.NewWSystem()
 	wsystem.BandwidthMHz = 10
-	MaxCarriers := 1
-	for _, rxid := range rxids {
-		metrics := wsystem.EvaluteMetric(&singlecell, &hatamodel, rxid, myfunc)
+	wsystem.FrequencyGHz = 1.8
 
-		if len(metrics) > 1 {
-			// log.Printf("%s[%d] Supports %d Carriers", "UE", rxid, len(metrics))
-			MaxCarriers = int(math.Max(float64(MaxCarriers), float64(len(metrics))))
-			// log.Printf("%s[%d] Links %#v ", "UE", rxid, metrics)
-		}
-		AllMetrics = append(AllMetrics, metrics...)
-		MetricPerRx[rxid] = metrics
+	for _, rxid := range rxids {
+		metric := wsystem.EvaluteLinkMetric(&singlecell, &hatamodel, rxid, myfunc)
+
+		// 	// log.Printf("%s[%d] Supports %d Carriers", "UE", rxid, len(metrics))
+		// 	MaxCarriers = int(math.Max(float64(MaxCarriers), float64(len(metrics))))
+		// 	// log.Printf("%s[%d] Links %#v ", "UE", rxid, metrics)
+		// }
+		// AllMetrics = append(AllMetrics, metrics...)
+		AllRxMetrics[rxid] = metric
 	}
 	// vlib.SaveMapStructure2(MetricPerRx, "linkmetric.json", "UE", "LinkMetric", true)
-	vlib.SaveStructure(AllMetrics, "linkmetric2.json", true)
+	vlib.SaveStructure(AllRxMetrics, "linkmetric2.json", true)
 
 	//Generate SINR values for CDF
-	SINR := make(map[float64]vlib.VectorF)
+	var SINR vlib.VectorF
 	log.Println("Total Freqs", SINR)
-	counter := 0
+
 	w, fer := os.Create("nodeinfo.dat")
 	if fer != nil {
 		log.Print("Error Creating CSV file ", fer)
@@ -105,37 +105,32 @@ func main() {
 	// var record [4]string
 	cwr.Comma = '\t'
 	w.WriteString("%NodeID\tFreqHz\tX\tY\tSINR\n")
-	for _, metric := range MetricPerRx {
+	for _, metric := range AllRxMetrics {
+		// temp.AppendAtEnd(metric[f].BestRSRP - (metric[f].N0))
+		SINR.AppendAtEnd(metric.BestSINR)
+		loc := singlecell.Nodes[metric.RxNodeID].Location
+		record := strings.Split(fmt.Sprintf("%d\t%f\t%f\t%f\t%f", metric.RxNodeID, metric.FreqInGHz, loc.X, loc.Y, metric.BestSINR), "\t")
 
-		for f := 0; f < len(metric); f++ {
-
-			temp := SINR[metric[f].FreqInGHz]
-			// temp.AppendAtEnd(metric[f].BestRSRP - (metric[f].N0))
-			temp.AppendAtEnd(metric[f].BestSINR)
-			loc := singlecell.Nodes[metric[f].RxNodeID].Location
-			record := strings.Split(fmt.Sprintf("%d\t%f\t%f\t%f\t%f", metric[f].RxNodeID, metric[f].FreqInGHz, loc.X, loc.Y, metric[f].BestSINR), "\t")
-			SINR[metric[f].FreqInGHz] = temp
-			cwr.Write(record)
-			// if counter < 10 {
-			// 	fmt.Printf("\nrxid=%d indx %d Freq %f Value %v, %f", rxid, f, metric[f].FreqInGHz, metric[f].BestSINR, SINR[metric[f].FreqInGHz])
-			// }
-		}
-		counter++
+		cwr.Write(record)
+		// if counter < 10 {
+		// 	fmt.Printf("\nrxid=%d indx %d Freq %f Value %v, %f", rxid, f, metric[f].FreqInGHz, metric[f].BestSINR, SINR[metric[f].FreqInGHz])
+		// }
 	}
+
 	cwr.Flush()
 	w.Close()
 	matlab.Close()
-	cnt := 0
+
 	matlab = vlib.NewMatlab("sinrVal.m")
 	legendstring := ""
-	for f, sinr := range SINR {
-		log.Printf("\n F%d=%f \nSINR%d= %v", cnt, f, cnt, len(sinr))
-		str := fmt.Sprintf("sinr%d", int(f*1000))
+	for _, sinr := range SINR {
+
+		str := fmt.Sprintf("sinr%d", int(wsystem.FrequencyGHz*1000))
 		// str = strings.Replace(str, ".", "", -1)
 		matlab.Export(str, sinr)
 		matlab.Command("cdfplot(" + str + ");hold all;")
 		legendstring += str + " "
-		cnt++
+
 	}
 	matlab.Export("TxPower", singlecell.GetNodeType("BS").TxPowerDBm)
 	matlab.Export("AntennaGainDb", defaultAAS.GainDb)
@@ -195,14 +190,14 @@ func DeployLayer1(system *deployment.DropSystem) {
 	/// Create Antennas for each BS-NODE
 
 	bsids := system.GetNodeIDs("BS")
-	templateAAS = make([]antenna.SettingAAS, system.NodeCount("BS"))
+	templateAAS = make(map[int]*antenna.SettingAAS)
 	// sectorBW := 360.0 / float64(nSectors)
+	for _, i := range bsids {
+		temp := antenna.NewAAS()
+		*temp = defaultAAS
 
-	for i := 0; i < len(templateAAS); i++ {
-		templateAAS[i] = *antenna.NewAAS()
-		templateAAS[i] = defaultAAS
+		templateAAS[i] = temp
 		templateAAS[i].FreqHz = CarriersGHz[0] * 1.e9
-
 		// templateAAS[i].HBeamWidth = 65
 		templateAAS[i].HTiltAngle = secangles[vlib.ModInt(i, 3)]
 		if nSectors == 1 {
@@ -215,7 +210,7 @@ func DeployLayer1(system *deployment.DropSystem) {
 		hgain := vlib.NewVectorF(360)
 		cnt := 0
 		cmd := `delta=pi/180;
-phaseangle=0:delta:2*pi-delta;`
+		phaseangle=0:delta:2*pi-delta;`
 		matlab.Command(cmd)
 		for d := 0; d < 360; d++ {
 			hgain[cnt] = templateAAS[i].ElementDirectionHGain(float64(d))
@@ -227,7 +222,12 @@ phaseangle=0:delta:2*pi-delta;`
 		cmd = fmt.Sprintf("polar(phaseangle,gain%d);hold all", i)
 		matlab.Command(cmd)
 	}
-	vlib.SaveStructure(templateAAS, "antennaArray.json")
+	fmt.Println("Allantnena", templateAAS)
+
+	mtype := reflect.TypeOf(templateAAS)
+	// fmt.Println(mtype.Key(), mtype.Elem(), mtype.Elem().Kind(), strings.TrimLeft(mtype.Elem().String(), "*"))
+
+	vlib.SaveMapStructure2(templateAAS, "antennaArray.json", "nodeid", strings.TrimLeft(mtype.Elem().String(), "*"))
 	vlib.SaveStructure(system, "dep.json", true)
 
 }
@@ -235,7 +235,13 @@ phaseangle=0:delta:2*pi-delta;`
 func myfunc(nodeID int) antenna.SettingAAS {
 	// atype := singlecell.Nodes[txnodeID]
 	/// all nodeid same antenna
+	obj, ok := templateAAS[nodeID]
+	if !ok {
+		log.Printf("No antenna created !! for %d ", nodeID)
+		return defaultAAS
+	} else {
 
-	// fmt.Printf("\nNode %d , sector %v", nodeID, vlib.ModInt(nodeID, 3))
-	return templateAAS[nodeID]
+		// fmt.Printf("\nNode %d , sector %v", nodeID, vlib.ModInt(nodeID, 3))
+		return *obj
+	}
 }
