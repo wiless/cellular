@@ -26,13 +26,13 @@ type Node struct {
 	Indoor      bool
 	Orientation vlib.VectorF
 	AntennaType int
-	TxPower     float64
+	TxPowerDBm  float64
 	FreqGHz     vlib.VectorF
 	Mode        TxRxMode `json:"TxRxMode"`
 }
 
 type DropParameter struct {
-	Centre     complex128
+	Centre     vlib.Location3D
 	Type       DropType
 	Randomnoss bool // if true, uniformly distributed else equallyspaced in region
 
@@ -66,14 +66,14 @@ func (d DropParameter) MarshalJSON() ([]byte, error) {
 }
 
 type NodeType struct {
-	Name    string
-	Hmin    float64
-	Hmax    float64
-	Count   int
-	startID int
-	NodeIDs vlib.VectorI `json:",strings"`
-	Params  DropParameter
-	TxPower float64
+	Name       string
+	Hmin       float64
+	Hmax       float64
+	Count      int
+	startID    int
+	NodeIDs    vlib.VectorI `json:",strings"`
+	Params     DropParameter
+	TxPowerDBm float64
 }
 
 type DropType int
@@ -240,7 +240,7 @@ func (d *DropSystem) NewNode(ntype string) *Node {
 	node.AntennaType = 0
 	node.Orientation = []float64{0, 0} /// Horizontal, Vertical orientation in degree
 	node.Mode = Inactive
-	node.TxPower = 1
+	node.TxPowerDBm = 1
 	if notype.Hmin == notype.Hmax {
 		node.Location.SetXY(0, 0)
 		node.Location.SetHeight(notype.Hmin)
@@ -257,27 +257,25 @@ func (d *DropSystem) NewNode(ntype string) *Node {
 	return node
 }
 
-func (d *dDropSetting) SetTxNodeNames(names ...string) {
-	d.TxNodeNames = names
+//Set NodeTypes of typename(s) as Transmit Capabilities
+func (d *dDropSetting) SetTxNodeNames(typename ...string) {
+	d.TxNodeNames = typename
+
 }
 
-func (d *dDropSetting) SetRxNodeNames(names ...string) {
-	d.RxNodeNames = names
+//Set NodeTypes of typename(s) as Receive Capabilities
+func (d *dDropSetting) SetRxNodeNames(typename ...string) {
+	d.RxNodeNames = typename
 }
 
+//Returns the  name of the nodetypes which are configured as Transmit capabilities
 func (d *dDropSetting) GetTxNodeNames() []string {
 	return d.TxNodeNames
 }
 
+//Returns the  name of the nodetypes which are configured as Receive capabilities
 func (d *dDropSetting) GetRxNodeNames() []string {
 	return d.RxNodeNames
-}
-func from2D(loc complex128, height float64) [3]float64 {
-	var result [3]float64
-	result[0] = real(loc)
-	result[1] = imag(loc)
-	result[2] = height
-	return result
 }
 
 func NewNodeType(name string, heights ...float64) *NodeType {
@@ -349,7 +347,7 @@ func (d *DropSystem) Init() {
 
 		for i := 0; i < d.NodeTypes[indx].Count; i++ {
 			node := d.NewNode(d.NodeTypes[indx].Name)
-			node.TxPower = d.NodeTypes[indx].TxPower
+			node.TxPowerDBm = d.NodeTypes[indx].TxPowerDBm
 			d.Nodes[node.ID] = *node
 			d.NodeTypes[indx].NodeIDs[i] = node.ID
 		}
@@ -557,8 +555,10 @@ func (d *DropSystem) SetAllNodeProperty(ntype, property string, data interface{}
 			}
 			el.FieldByName(property).Set(reflect.ValueOf(data))
 			// log.Printf("\n A4 Node  %v", node)
-			// stvalue.FieldByName(property).Set(reflect.ValueOf(data))
+			//stvalue.FieldByName(property).Set(reflect.ValueOf(data))
 			d.Nodes[val] = node
+		} else {
+			log.Printf("Field '%s' Not found", property)
 		}
 		// node.Location.FromCmplx()
 	}
@@ -778,19 +778,19 @@ func (d *DropSystem) GetNodeIDs(ntype string) vlib.VectorI {
 func (d *DropSystem) Drop(dp *DropParameter, result *vlib.VectorC) error {
 	switch dp.Type {
 	case Circular:
-		locations := CircularPoints(dp.Centre, dp.Radius, dp.NCount)
+		locations := CircularPoints(dp.Centre.Cmplx(), dp.Radius, dp.NCount)
 		result = &locations
 		return nil
 	case Rectangular:
-		locations := RectangularEqPoints(dp.Centre, dp.Radius, dp.RotationDegree, dp.NCount)
+		locations := RectangularEqPoints(dp.Centre.Cmplx(), dp.Radius, dp.RotationDegree, dp.NCount)
 		result = &locations
 		return nil
 	case Hexagonal:
-		locations := HexRandU(dp.Centre, dp.Radius, dp.NCount, 0)
+		locations := HexRandU(dp.Centre.Cmplx(), dp.Radius, dp.NCount, 0)
 		result = &locations
 		return nil
 	case Annular:
-		locations := AnnularRingPoints(dp.Centre, dp.InnerRadius, dp.Radius, dp.NCount)
+		locations := AnnularRingPoints(dp.Centre.Cmplx(), dp.InnerRadius, dp.Radius, dp.NCount)
 		result = &locations
 		return nil
 	default:
