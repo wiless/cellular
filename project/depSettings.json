@@ -1,0 +1,56 @@
+{
+	"NodeTypes": [
+		{
+			"Name": "BS",
+			"Hmin": 30,
+			"Hmax": 30,
+			"Count": 19,
+			"NodeIDs": [],
+			"Params": {
+				"Centre": {
+					"X": 0,
+					"Y": 0,
+					"Z": 0
+				},
+				"InnerRadius": 0,
+				"InnerRotationDegree": 0,
+				"NCount": 0,
+				"Radius": 0,
+				"Randomnoss": false,
+				"RotationDegree": 0,
+				"Type": 0
+			},
+			"TxPowerDBm": 10
+		},
+		{
+			"Name": "UE",
+			"Hmin": 1.1,
+			"Hmax": 1.1,
+			"Count": 10450,
+			"NodeIDs": [],
+			"Params": {
+				"Centre": {
+					"X": 0,
+					"Y": 0,
+					"Z": 0
+				},
+				"InnerRadius": 0,
+				"InnerRotationDegree": 0,
+				"NCount": 0,
+				"Radius": 0,
+				"Randomnoss": false,
+				"RotationDegree": 0,
+				"Type": 0
+			},
+			"TxPowerDBm": 0
+		}
+	],
+	"CoverageRegion": {
+		"Celltype": 0,
+		"Dimensions": [
+			250
+		]
+	},
+	"TxNodeNames": null,
+	"RxNodeNames": null
+}

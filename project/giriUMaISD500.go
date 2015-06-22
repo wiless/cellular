@@ -62,6 +62,7 @@ func main() {
 	rand.Seed(seedvalue)
 
 	var hatamodel pathloss.OkumuraHata
+	// var fishmodel richard.FishModel
 
 	DeployLayer1(&singlecell)
 
