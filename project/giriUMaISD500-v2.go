@@ -22,35 +22,41 @@ import (
 
 var matlab *vlib.Matlab
 var defaultAAS antenna.SettingAAS
-var templateAAS map[int]*antenna.SettingAAS
+var systemAntennas map[int]*antenna.SettingAAS
 
 var singlecell deployment.DropSystem
 var secangles = vlib.VectorF{0.0, 120.0, -120.0}
-var nSectors = 1
+var nSectors = 3
 var CellRadius = 250.0
 var nUEPerCell = 550
-var nCells = 19
+var nCells = 7
 var CarriersGHz = vlib.VectorF{0.4, 1.8}
 
 func init() {
 
 	defaultAAS.SetDefault()
-	defaultAAS.N = 1
-	defaultAAS.FreqHz = CarriersGHz[0]
-	defaultAAS.BeamTilt = 0
-	defaultAAS.DisableBeamTit = false
-	defaultAAS.VTiltAngle = 30
-	defaultAAS.ESpacingVFactor = .5
-	defaultAAS.HTiltAngle = 0
-	defaultAAS.MfileName = "output.m"
-	defaultAAS.Omni = true
-	defaultAAS.GainDb = 10
-	defaultAAS.HoldOn = false
-	defaultAAS.AASArrayType = antenna.LinearPhaseArray
-	defaultAAS.CurveWidthInDegree = 30.0
-	defaultAAS.CurveRadius = 1.00
 
-	vlib.SaveStructure(defaultAAS, "defaultAAS.json", true)
+	vlib.LoadStructure("omni.json", &defaultAAS)
+	// vlib.LoadStructure("sector.json", &defaultAAS)
+
+	// vlib.LoadStructure("omni.json", defaultAAS)
+
+	// defaultAAS.N = 1
+	// defaultAAS.FreqHz = CarriersGHz[0]
+	// defaultAAS.BeamTilt = 0
+	// defaultAAS.DisableBeamTit = false
+	// defaultAAS.VTiltAngle = 30
+	// defaultAAS.ESpacingVFactor = .5
+	// defaultAAS.HTiltAngle = 0
+	// defaultAAS.MfileName = "output.m"
+	// defaultAAS.Omni = true
+	// defaultAAS.GainDb = 10
+	// defaultAAS.HoldOn = false
+	// defaultAAS.AASArrayType = antenna.LinearPhaseArray
+	// defaultAAS.CurveWidthInDegree = 30.0
+	// defaultAAS.CurveRadius = 1.00
+
+	// vlib.SaveStructure(defaultAAS, "defaultAAS.json", true)
 }
 
 func main() {
@@ -69,9 +75,20 @@ func main() {
 	DeployLayer1(&singlecell)
 
 	// singlecell.SetAllNodeProperty("BS", "AntennaType", 0)
-	// singlecell.SetAllNodeProperty("UE", "AntennaType", 1)       /// Set All Pico to use antenna Type 1
-	singlecell.SetAllNodeProperty("BS", "FreqGHz", CarriersGHz) /// Set All Pico to use antenna Type 0
-	singlecell.SetAllNodeProperty("UE", "FreqGHz", CarriersGHz) /// Set All Pico to use antenna Type 0
+	// singlecell.SetAllNodeProperty("UE", "AntennaType", 1)
+	singlecell.SetAllNodeProperty("UE", "FreqGHz", CarriersGHz)
+	layerBS := []string{"BS0", "BS1", "BS2"}
+	for indx, bs := range layerBS {
+		singlecell.SetAllNodeProperty(bs, "FreqGHz", CarriersGHz)
+		singlecell.SetAllNodeProperty(bs, "TxPowerDBm", 44.0)
+		singlecell.SetAllNodeProperty(bs, "Direction", secangles[indx])
+		bsids := singlecell.GetNodeIDs(bs)
+		fmt.Printf("\n %s : %v", bs, bsids)
+		CreateAntennas(singlecell, bsids)
+	}
+
+	vlib.SaveStructure(systemAntennas, "antennaArray.json", true)
+	vlib.SaveStructure(singlecell.GetSetting(), "dep.json", true)
 
 	rxids := singlecell.GetNodeIDs("UE")
 	RxMetrics400 := make(map[int]cell.LinkMetric)
@@ -81,52 +98,43 @@ func main() {
 	wsystem := cell.NewWSystem()
 	wsystem.BandwidthMHz = 10
 	wsystem.FrequencyGHz = 1.8
-
-	singlecell.SetAllNodeProperty("BS", "TxPowerDBm", 44.0)
 	for _, rxid := range rxids {
-
 		metric := wsystem.EvaluteLinkMetric(&singlecell, &hatamodel, rxid, myfunc)
 		RxMetrics400[rxid] = metric
-
 	}
+	DumpMap2CSV("table400.dat", RxMetrics400)
 	vlib.SaveStructure(RxMetrics400, "metric400MHz.json", true)
 
-	/// System 2 @ 1800MHz
-	RxMetrics1800 := make(map[int]cell.LinkMetric)
-	wsystem.BandwidthMHz = 10
-	wsystem.FrequencyGHz = 0.4
-	singlecell.SetAllNodeProperty("BS", "TxPowerDBm", 22.0)
-	for _, rxid := range rxids {
-		metric := wsystem.EvaluteLinkMetric(&singlecell, &hatamodel, rxid, myfunc)
-		RxMetrics1800[rxid] = metric
-	}
-	vlib.SaveStructure(RxMetrics1800, "metric1800MHz.json", true)
-
-	// SINR := CalculateSINR(RxMetrics1800)
-
-	var SINR vlib.VectorF
-	// log.Println("Total Freqs", SINR)
-
-	DumpMap2CSV("table400.dat", RxMetrics400)
-	DumpMap2CSV("table1800.dat", RxMetrics1800)
+	// /// System 2 @ 1800MHz
+	// RxMetrics1800 := make(map[int]cell.LinkMetric)
+	// wsystem.BandwidthMHz = 10
+	// wsystem.FrequencyGHz = 0.4
+	// singlecell.SetAllNodeProperty("BS", "TxPowerDBm", 22.0)
+	// for _, rxid := range rxids {
+	// 	metric := wsystem.EvaluteLinkMetric(&singlecell, &hatamodel, rxid, myfunc)
+	// 	RxMetrics1800[rxid] = metric
+	// }
+	// vlib.SaveStructure(RxMetrics1800, "metric1800MHz.json", true)
+	// DumpMap2CSV("table1800.dat", RxMetrics1800)
 
 	matlab.Close()
 
-	matlab = vlib.NewMatlab("sinrVal.m")
-	legendstring := ""
-	for _, sinr := range SINR {
+	// matlab = vlib.NewMatlab("sinrVal.m")
+	// legendstring := ""
+	// var SINR vlib.VectorF
+	// for _, sinr := range SINR {
 
-		str := fmt.Sprintf("sinr%d", int(wsystem.FrequencyGHz*1000))
-		// str = strings.Replace(str, ".", "", -1)
-		matlab.Export(str, sinr)
-		matlab.Command("cdfplot(" + str + ");hold all;")
-		legendstring += str + " "
+	// 	str := fmt.Sprintf("sinr%d", int(wsystem.FrequencyGHz*1000))
+	// 	// str = strings.Replace(str, ".", "", -1)
+	// 	matlab.Export(str, sinr)
+	// 	matlab.Command("cdfplot(" + str + ");hold all;")
+	// 	legendstring += str + " "
 
-	}
-	matlab.Export("TxPower", singlecell.GetNodeType("BS").TxPowerDBm)
-	matlab.Export("AntennaGainDb", defaultAAS.GainDb)
-	matlab.Command(fmt.Sprintf("legend %v", legendstring))
-	matlab.Close()
+	// }
+	// matlab.Export("TxPower", singlecell.GetNodeType("BS").TxPowerDBm)
+	// matlab.Export("AntennaGainDb", defaultAAS.GainDb)
+	// matlab.Command(fmt.Sprintf("legend %v", legendstring))
+	// matlab.Close()
 	fmt.Println("\n")
 }
 
@@ -145,7 +153,15 @@ func DeployLayer1(system *deployment.DropSystem) {
 			// setting.SetCoverage(deployment.CircularCoverage(AreaRadius))
 
 			/// NodeType should come from API calls
-			newnodetype := deployment.NodeType{Name: "BS", Hmin: 30.0, Hmax: 30.0, Count: nCells * nSectors}
+			newnodetype := deployment.NodeType{Name: "BS0", Hmin: 30.0, Hmax: 30.0, Count: nCells}
+			newnodetype.Mode = deployment.TransmitOnly
+			setting.AddNodeType(newnodetype)
+
+			newnodetype = deployment.NodeType{Name: "BS1", Hmin: 30.0, Hmax: 30.0, Count: nCells}
+			newnodetype.Mode = deployment.TransmitOnly
+			setting.AddNodeType(newnodetype)
+
+			newnodetype = deployment.NodeType{Name: "BS2", Hmin: 30.0, Hmax: 30.0, Count: nCells}
 			newnodetype.Mode = deployment.TransmitOnly
 			setting.AddNodeType(newnodetype)
 
@@ -154,7 +170,7 @@ func DeployLayer1(system *deployment.DropSystem) {
 			newnodetype.Mode = deployment.ReceiveOnly
 			setting.AddNodeType(newnodetype)
 
-			vlib.SaveStructure(setting, "depSettings.json", true)
+			// vlib.SaveStructure(setting, "depSettings.json", true)
 
 		} else {
 			vlib.LoadStructure("depSettings.json", setting)
@@ -167,19 +183,17 @@ func DeployLayer1(system *deployment.DropSystem) {
 	system.Init()
 
 	// Workaround else should come from API calls or Databases
-	bslocations := LoadBSLocations(system)
-	system.SetAllNodeLocation("BS", vlib.Location3DtoVecC(bslocations))
+	// bslocations := LoadBSLocations(system)
+	// system.SetAllNodeLocation("BS", vlib.Location3DtoVecC(bslocations))
+
+	clocations := deployment.HexGrid(nCells, vlib.Origin3D, CellRadius, 30)
+	system.SetAllNodeLocation("BS0", vlib.Location3DtoVecC(clocations))
+	system.SetAllNodeLocation("BS1", vlib.Location3DtoVecC(clocations))
+	system.SetAllNodeLocation("BS2", vlib.Location3DtoVecC(clocations))
 
 	// Workaround else should come from API calls or Databases
 	uelocations := LoadUELocations(system)
 	system.SetAllNodeLocation("UE", uelocations)
-
-	bsids := system.GetNodeIDs("BS")
-	CreateAntennasForNetwork(system, bsids)
-
-	vlib.SaveStructure(templateAAS, "antennaArray.json", true)
-	vlib.SaveStructure(system, "dep.json", true)
-
 }
 func LoadBSLocations(system *deployment.DropSystem) []vlib.Location3D {
 	/// Drop BS Nodes
@@ -212,7 +226,7 @@ func LoadUELocations(system *deployment.DropSystem) vlib.VectorC {
 func myfunc(nodeID int) antenna.SettingAAS {
 	// atype := singlecell.Nodes[txnodeID]
 	/// all nodeid same antenna
-	obj, ok := templateAAS[nodeID]
+	obj, ok := systemAntennas[nodeID]
 	if !ok {
 		log.Printf("No antenna created !! for %d ", nodeID)
 		return defaultAAS
@@ -223,24 +237,33 @@ func myfunc(nodeID int) antenna.SettingAAS {
 	}
 }
 
-func CreateAntennasForNetwork(system *deployment.DropSystem, bsids vlib.VectorI) {
-	templateAAS = make(map[int]*antenna.SettingAAS)
-	// sectorBW := 360.0 / float64(nSectors)
+func CreateAntennas(system deployment.DropSystem, bsids vlib.VectorI) {
+	if systemAntennas == nil {
+		systemAntennas = make(map[int]*antenna.SettingAAS)
+	}
+
+	omni := antenna.NewAAS()
+	sector := antenna.NewAAS()
+
+	vlib.LoadStructure("omni.json", omni)
+	vlib.LoadStructure("sector.json", sector)
+
 	for _, i := range bsids {
-		temp := antenna.NewAAS()
-		*temp = defaultAAS
-		// temp.Set(str)
-		// temp.Set(defaultAAS.Get())
-		templateAAS[i] = temp
-		templateAAS[i].FreqHz = CarriersGHz[0] * 1.e9
-		// templateAAS[i].HBeamWidth = 65
-		templateAAS[i].HTiltAngle = secangles[vlib.ModInt(i, 3)]
+
+		fmt.Printf("\nBS %d, Direction : %f", i, system.Nodes[i].Direction)
+
+		systemAntennas[i] = omni
+		systemAntennas[i].FreqHz = CarriersGHz[0] * 1.e9
+		// systemAntennas[i].HBeamWidth = 65
+
+		systemAntennas[i].HTiltAngle = secangles[vlib.ModInt(i, 3)]
+
 		if nSectors == 1 {
-			templateAAS[i].Omni = true
+			systemAntennas[i].Omni = true
 		} else {
-			templateAAS[i].Omni = false
+			systemAntennas[i].Omni = false
 		}
-		templateAAS[i].CreateElements(system.Nodes[bsids[i]].Location)
+		systemAntennas[i].CreateElements(system.Nodes[i].Location)
 
 		hgain := vlib.NewVectorF(360)
 		cnt := 0
@@ -248,7 +271,46 @@ func CreateAntennasForNetwork(system *deployment.DropSystem, bsids vlib.VectorI)
 		phaseangle=0:delta:2*pi-delta;`
 		matlab.Command(cmd)
 		for d := 0; d < 360; d++ {
-			hgain[cnt] = templateAAS[i].ElementDirectionHGain(float64(d))
+			hgain[cnt] = systemAntennas[i].ElementDirectionHGain(float64(d))
+			cnt++
+		}
+
+		matlab.Export("gain"+strconv.Itoa(i), hgain)
+
+		cmd = fmt.Sprintf("polar(phaseangle,gain%d);hold all", i)
+		matlab.Command(cmd)
+	}
+}
+
+func CreateAntennasForNetwork(system *deployment.DropSystem, bsids vlib.VectorI) {
+	systemAntennas = make(map[int]*antenna.SettingAAS)
+	// sectorBW := 360.0 / float64(nSectors)
+	for _, i := range bsids {
+		temp := antenna.NewAAS()
+		*temp = defaultAAS
+		// temp.Set(str)
+		// temp.Set(defaultAAS.Get())
+		systemAntennas[i] = temp
+		systemAntennas[i].FreqHz = CarriersGHz[0] * 1.e9
+		// systemAntennas[i].HBeamWidth = 65
+
+		systemAntennas[i].HTiltAngle = secangles[vlib.ModInt(i, 3)]
+		fmt.Println(system.Nodes[bsids[i]].Direction)
+
+		if nSectors == 1 {
+			systemAntennas[i].Omni = true
+		} else {
+			systemAntennas[i].Omni = false
+		}
+		systemAntennas[i].CreateElements(system.Nodes[bsids[i]].Location)
+
+		hgain := vlib.NewVectorF(360)
+		cnt := 0
+		cmd := `delta=pi/180;
+		phaseangle=0:delta:2*pi-delta;`
+		matlab.Command(cmd)
+		for d := 0; d < 360; d++ {
+			hgain[cnt] = systemAntennas[i].ElementDirectionHGain(float64(d))
 			cnt++
 		}
 

@@ -26,6 +26,7 @@ type Node struct {
 	Indoor      bool
 	Orientation vlib.VectorF
 	AntennaType int
+	Direction   float64
 	TxPowerDBm  float64
 	FreqGHz     vlib.VectorF
 	Mode        TxRxMode `json:"TxRxMode"`
@@ -65,6 +66,10 @@ func (d DropParameter) MarshalJSON() ([]byte, error) {
 	return fx, rerr
 }
 
+const (
+	OMNIDIRECTION float64 = 9990
+)
+
 type NodeType struct {
 	Name       string
 	Hmin       float64
@@ -74,6 +79,9 @@ type NodeType struct {
 	NodeIDs    vlib.VectorI `json:",strings"`
 	Params     DropParameter
 	TxPowerDBm float64
+	Direction  float64 // Direction in degree 0 to 360, If set > 360 or 9999 its OMNI
+
+	Mode TxRxMode `json:"TxRxMode"`
 }
 
 type DropType int
@@ -87,8 +95,9 @@ var TxRxModes = [...]string{
 }
 
 func (c TxRxMode) String() string {
+	// log.Println("SHIFTED ", int(c)>>1)
 	if int(c) >= len(TxRxModes) {
-		return "Unknown!!"
+		return "Unknown-TxRxMode"
 	}
 
 	return TxRxModes[c]
@@ -190,8 +199,6 @@ type dDropSetting struct {
 	// minDistance    map[NodePair]float64 `json:"-"`
 	CoverageRegion Area // For circular its just radius, Rectangular, its length, width
 	isInitialized  bool
-	TxNodeNames    []string
-	RxNodeNames    []string
 }
 
 func (d *dDropSetting) NodeCount(ntype string) int {
@@ -239,7 +246,7 @@ func (d *DropSystem) NewNode(ntype string) *Node {
 	node.FreqGHz = []float64{FcInGHz}
 	node.AntennaType = 0
 	node.Orientation = []float64{0, 0} /// Horizontal, Vertical orientation in degree
-	node.Mode = Inactive
+	node.Mode = notype.Mode
 	node.TxPowerDBm = 1
 	if notype.Hmin == notype.Hmax {
 		node.Location.SetXY(0, 0)
@@ -259,28 +266,54 @@ func (d *DropSystem) NewNode(ntype string) *Node {
 
 //Set NodeTypes of typename(s) as Transmit Capabilities
 func (d *dDropSetting) SetTxNodeNames(typename ...string) {
-	d.TxNodeNames = typename
 
+	for i := 0; i < len(d.NodeTypes); i++ {
+		found, _ := vlib.Contains(typename, d.NodeTypes[i].Name)
+		if found {
+			d.NodeTypes[i].Mode = TransmitOnly
+		}
+	}
 }
 
 //Set NodeTypes of typename(s) as Receive Capabilities
 func (d *dDropSetting) SetRxNodeNames(typename ...string) {
-	d.RxNodeNames = typename
+
+	for i := 0; i < len(d.NodeTypes); i++ {
+		found, _ := vlib.Contains(typename, d.NodeTypes[i].Name)
+		if found {
+			d.NodeTypes[i].Mode = ReceiveOnly
+		}
+	}
+
+}
+
+func (d *dDropSetting) GetNodeTypesOfMode(mode TxRxMode) []string {
+	result := make([]string, 0, len(d.NodeTypes))
+	cnt := 0
+	for _, val := range d.NodeTypes {
+		if val.Mode == mode {
+			result = append(result, val.Name)
+			cnt++
+		}
+	}
+	// fmt.Println(result)
+	return result
 }
 
 //Returns the  name of the nodetypes which are configured as Transmit capabilities
 func (d *dDropSetting) GetTxNodeNames() []string {
-	return d.TxNodeNames
+	return d.GetNodeTypesOfMode(TransmitOnly)
 }
 
 //Returns the  name of the nodetypes which are configured as Receive capabilities
 func (d *dDropSetting) GetRxNodeNames() []string {
-	return d.RxNodeNames
+	return d.GetNodeTypesOfMode(ReceiveOnly)
 }
 
 func NewNodeType(name string, heights ...float64) *NodeType {
 	result := new(NodeType)
 	result.Name = name
+	result.Direction = OMNIDIRECTION //Default direction of the Nodes of this type have antenna
 	switch len(heights) {
 	case 0:
 		result.Hmax, result.Hmax = 0, 0
@@ -348,6 +381,7 @@ func (d *DropSystem) Init() {
 		for i := 0; i < d.NodeTypes[indx].Count; i++ {
 			node := d.NewNode(d.NodeTypes[indx].Name)
 			node.TxPowerDBm = d.NodeTypes[indx].TxPowerDBm
+			node.Direction = d.NodeTypes[indx].Direction
 			d.Nodes[node.ID] = *node
 			d.NodeTypes[indx].NodeIDs[i] = node.ID
 		}
@@ -358,31 +392,29 @@ func (d *DropSystem) Init() {
 	/// Set all nodes of type TxNodes to transmit only
 	//
 	//
-	log.Println("tx Nodes ", d.TxNodeNames)
-	log.Println("rx Nodes ", d.RxNodeNames)
 
 	for _, ntype := range d.NodeTypes {
 
-		var currentMode TxRxMode = Inactive
-		var support int = -1
+		// var currentMode TxRxMode = Inactive
+		// var support int = -1
 
-		if found, _ := vlib.Contains(d.TxNodeNames, ntype.Name); found {
-			currentMode = TransmitOnly
-			support = +1
-		}
-		if found, _ := vlib.Contains(d.RxNodeNames, ntype.Name); found {
-			currentMode = ReceiveOnly
-			support = +1
-		}
-		if support == 2 {
-			currentMode = Duplex
-		}
+		// if found, _ := vlib.Contains(d.TxNodeNames, ntype.Name); found {
+		// 	currentMode = TransmitOnly
+		// 	support = +1
+		// }
+		// if found, _ := vlib.Contains(d.RxNodeNames, ntype.Name); found {
+		// 	currentMode = ReceiveOnly
+		// 	support = +1
+		// }
+		// if support == 2 {
+		// 	currentMode = Duplex
+		// }
+
 		for _, val := range ntype.NodeIDs {
 			//
-
 			node := d.Nodes[val]
 			// log.Printf("\n Setting  %s [%d] to Type %s", node.Type, node.ID, currentMode)
-			node.Mode = currentMode
+			node.Mode = ntype.Mode
 			d.Nodes[val] = node
 		}
 

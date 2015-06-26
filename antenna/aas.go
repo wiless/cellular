@@ -457,6 +457,7 @@ func (s SettingAAS) ElementDirectionHGain(degree float64) float64 {
 	theta3Db := (s.HBeamWidth)
 	SLAV := s.SLAV
 	tilt := -(s.HTiltAngle)
+	//  Reference TS25.996 - Section 4.5 - BS Antenna Pattern
 	val := math.Pow(10, -math.Min(12.0*math.Pow((theta-tilt)/theta3Db, 2), SLAV)/10.0)
 	return val
 }
