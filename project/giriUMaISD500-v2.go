@@ -1,14 +1,11 @@
 package main
 
 import (
-	"encoding/csv"
 	"fmt"
 	"log"
 	"math/rand"
 	"os"
-	"reflect"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/wiless/cellular/pathloss"
@@ -26,11 +23,12 @@ var systemAntennas map[int]*antenna.SettingAAS
 
 var singlecell deployment.DropSystem
 var secangles = vlib.VectorF{0.0, 120.0, -120.0}
-var nSectors = 3
-var CellRadius = 250.0
-var nUEPerCell = 550
-var nCells = 7
-var CarriersGHz = vlib.VectorF{0.4, 1.8}
+
+// var nSectors = 1
+var CellRadius = 500.0
+var nUEPerCell = 400
+var nCells = 19
+var CarriersGHz = vlib.VectorF{.4}
 
 func init() {
 
@@ -69,8 +67,9 @@ func main() {
 	seedvalue = 0
 	rand.Seed(seedvalue)
 
-	var hatamodel pathloss.OkumuraHata
-	// var fishmodel richard.FishModel
+	var plmodel pathloss.OkumuraHata
+	// var plmodel walfisch.WalfischIke
+	// var plmodel pathloss.SimplePLModel
 
 	DeployLayer1(&singlecell)
 
@@ -78,31 +77,100 @@ func main() {
 	// singlecell.SetAllNodeProperty("UE", "AntennaType", 1)
 	singlecell.SetAllNodeProperty("UE", "FreqGHz", CarriersGHz)
 	layerBS := []string{"BS0", "BS1", "BS2"}
+	var bsids vlib.VectorI
+
 	for indx, bs := range layerBS {
 		singlecell.SetAllNodeProperty(bs, "FreqGHz", CarriersGHz)
-		singlecell.SetAllNodeProperty(bs, "TxPowerDBm", 44.0)
+		singlecell.SetAllNodeProperty(bs, "TxPowerDBm", 22.0)
 		singlecell.SetAllNodeProperty(bs, "Direction", secangles[indx])
-		bsids := singlecell.GetNodeIDs(bs)
-		fmt.Printf("\n %s : %v", bs, bsids)
-		CreateAntennas(singlecell, bsids)
-	}
+		newids := singlecell.GetNodeIDs(bs)
+		bsids.AppendAtEnd(newids...)
+		fmt.Printf("\n %s : %v", bs, newids)
 
+	}
+	CreateAntennas(singlecell, bsids)
 	vlib.SaveStructure(systemAntennas, "antennaArray.json", true)
 	vlib.SaveStructure(singlecell.GetSetting(), "dep.json", true)
+	vlib.SaveStructure(singlecell.Nodes, "nodelist.json", true)
+
+	/// System 1 @ 400MHz
+	// Dump UE locations
+	{
+
+		fid, _ := os.Create("uelocations.dat")
+		ueids := singlecell.GetNodeIDs("UE")
+		fmt.Fprintf(fid, "%% ID\tX\tY\tZ")
+		for _, id := range ueids {
+			node := singlecell.Nodes[id]
+			fmt.Fprintf(fid, "\n %d \t %f \t %f \t %f \t %f \t %f ", id, node.Location.X, node.Location.Y, node.Location.Z)
+
+		}
+		fid.Close()
+
+	}
+
+	// Dump bs nodelocations
+	{
+		fid, _ := os.Create("bslocations.dat")
+
+		fmt.Fprintf(fid, "%% ID\tX\tY\tZ\tPower\tdirection")
+		for _, id := range bsids {
+			node := singlecell.Nodes[id]
+			// if id%7 == 0 {
+			// 	node.TxPowerDBm = 0
+			// } else {
+			// 	node.TxPowerDBm = 44
+			// }
+			fmt.Fprintf(fid, "\n %d \t %f \t %f \t %f \t %f \t %f ", id, node.Location.X, node.Location.Y, node.Location.Z, node.TxPowerDBm, node.Direction)
+
+		}
+		fid.Close()
+
+	}
+
+	wsystem := cell.NewWSystem()
+	wsystem.BandwidthMHz = 10
+	wsystem.FrequencyGHz = CarriersGHz[0]
 
 	rxids := singlecell.GetNodeIDs("UE")
 	RxMetrics400 := make(map[int]cell.LinkMetric)
 
-	/// System 1 @ 400MHz
+	baseCells := vlib.VectorI{0, 1, 2}
+	baseCells = baseCells.Scale(nCells)
 
-	wsystem := cell.NewWSystem()
-	wsystem.BandwidthMHz = 10
-	wsystem.FrequencyGHz = 1.8
+	wsystem.ActiveCells.AppendAtEnd(baseCells.Add(4)...)
+	// wsystem.ActiveCells.AppendAtEnd(baseCells.Add(1)...)
+
+	// cell := 2
+	// startid := 0 + nUEPerCell*(cell)
+	// endid := nUEPerCell * (cell + 1)
+	// cell0UE := rxids[startid:endid]
+	// log.Printf("\n ************** UEs of Cell %d := %v", cell, cell0UE)
 	for _, rxid := range rxids {
-		metric := wsystem.EvaluteLinkMetric(&singlecell, &hatamodel, rxid, myfunc)
+		metric := wsystem.EvaluteLinkMetric(&singlecell, &plmodel, rxid, myfunc)
 		RxMetrics400[rxid] = metric
+
 	}
-	DumpMap2CSV("table400.dat", RxMetrics400)
+
+	// Dump antenna nodelocations
+	{
+		fid, _ := os.Create("antennalocations.dat")
+
+		fmt.Fprintf(fid, "%% ID\tX\tY\tZ\tHDirection\tHWidth")
+		for _, id := range bsids {
+			ant := myfunc(id)
+			// if id%7 == 0 {
+			// 	node.TxPowerDBm = 0
+			// } else {
+			// 	node.TxPowerDBm = 44
+			// }
+			fmt.Fprintf(fid, "\n %d \t %f \t %f \t %f \t %f \t %f ", id, ant.Centre.X, ant.Centre.Y, ant.Centre.Z, ant.HTiltAngle, ant.HBeamWidth)
+
+		}
+		fid.Close()
+
+	}
+	vlib.DumpMap2CSV("table400.dat", RxMetrics400)
 	vlib.SaveStructure(RxMetrics400, "metric400MHz.json", true)
 
 	// /// System 2 @ 1800MHz
@@ -186,6 +254,9 @@ func DeployLayer1(system *deployment.DropSystem) {
 	// bslocations := LoadBSLocations(system)
 	// system.SetAllNodeLocation("BS", vlib.Location3DtoVecC(bslocations))
 
+	// area := deployment.RectangularCoverage(600)
+	// deployment.DropSetting.SetCoverage(area)
+
 	clocations := deployment.HexGrid(nCells, vlib.Origin3D, CellRadius, 30)
 	system.SetAllNodeLocation("BS0", vlib.Location3DtoVecC(clocations))
 	system.SetAllNodeLocation("BS1", vlib.Location3DtoVecC(clocations))
@@ -194,21 +265,9 @@ func DeployLayer1(system *deployment.DropSystem) {
 	// Workaround else should come from API calls or Databases
 	uelocations := LoadUELocations(system)
 	system.SetAllNodeLocation("UE", uelocations)
-}
-func LoadBSLocations(system *deployment.DropSystem) []vlib.Location3D {
-	/// Drop BS Nodes
-	bslocations := make([]vlib.Location3D, system.NodeCount("BS"))
 
-	clocations := deployment.HexGrid(nCells, vlib.FromCmplx(deployment.ORIGIN), CellRadius, 30)
-	/// three nodes with single cell centere
-	for i := 0; i < nCells; i++ {
-		for k := 0; k < nSectors; k++ {
-			bslocations[i*nSectors+k] = clocations[i]
-		}
-	}
-
-	return bslocations
 }
+
 func LoadUELocations(system *deployment.DropSystem) vlib.VectorC {
 
 	var uelocations vlib.VectorC
@@ -216,9 +275,11 @@ func LoadUELocations(system *deployment.DropSystem) vlib.VectorC {
 	for indx, bsloc := range hexCenters {
 		log.Printf("Deployed for cell %d ", indx)
 		ulocation := deployment.HexRandU(bsloc.Cmplx(), CellRadius, nUEPerCell, 30)
+		// for i, v := range ulocation {
+		// 	ulocation[i] = v + bsloc.Cmplx()
+		// }
 		uelocations = append(uelocations, ulocation...)
 	}
-
 	return uelocations
 
 }
@@ -232,7 +293,7 @@ func myfunc(nodeID int) antenna.SettingAAS {
 		return defaultAAS
 	} else {
 
-		// fmt.Printf("\nNode %d , sector %v", nodeID, vlib.ModInt(nodeID, 3))
+		// fmt.Printf("\nNode %d , Omni= %v, Dirction=%v and center is %v", nodeID, obj.Omni, obj.HTiltAngle, obj.Centre)
 		return *obj
 	}
 }
@@ -242,28 +303,27 @@ func CreateAntennas(system deployment.DropSystem, bsids vlib.VectorI) {
 		systemAntennas = make(map[int]*antenna.SettingAAS)
 	}
 
-	omni := antenna.NewAAS()
-	sector := antenna.NewAAS()
+	// omni := antenna.NewAAS()
+	// sector := antenna.NewAAS()
 
-	vlib.LoadStructure("omni.json", omni)
-	vlib.LoadStructure("sector.json", sector)
+	// vlib.LoadStructure("omni.json", omni)
+	// vlib.LoadStructure("sector.json", sector)
 
 	for _, i := range bsids {
-
-		fmt.Printf("\nBS %d, Direction : %f", i, system.Nodes[i].Direction)
-
-		systemAntennas[i] = omni
+		systemAntennas[i] = antenna.NewAAS()
+		vlib.LoadStructure("sector.json", systemAntennas[i])
 		systemAntennas[i].FreqHz = CarriersGHz[0] * 1.e9
 		// systemAntennas[i].HBeamWidth = 65
 
-		systemAntennas[i].HTiltAngle = secangles[vlib.ModInt(i, 3)]
+		systemAntennas[i].HTiltAngle = system.Nodes[i].Direction
 
-		if nSectors == 1 {
-			systemAntennas[i].Omni = true
-		} else {
-			systemAntennas[i].Omni = false
-		}
+		// if nSectors == 1 {
+		// 	systemAntennas[i].Omni = true
+		// } else {
+		// 	systemAntennas[i].Omni = false
+		// }
 		systemAntennas[i].CreateElements(system.Nodes[i].Location)
+		// fmt.Printf("\nType=%s , BSid=%d : System Antenna : %v", system.Nodes[i].Type, i, systemAntennas[i].Centre)
 
 		hgain := vlib.NewVectorF(360)
 		cnt := 0
@@ -272,107 +332,14 @@ func CreateAntennas(system deployment.DropSystem, bsids vlib.VectorI) {
 		matlab.Command(cmd)
 		for d := 0; d < 360; d++ {
 			hgain[cnt] = systemAntennas[i].ElementDirectionHGain(float64(d))
+			// hgain[cnt] = systemAntennas[i].ElementEffectiveGain(thetaH, thetaV)
 			cnt++
 		}
 
 		matlab.Export("gain"+strconv.Itoa(i), hgain)
+		// fmt.Printf("\nBS %d, Antenna : %#v", i, systemAntennas[i])
 
 		cmd = fmt.Sprintf("polar(phaseangle,gain%d);hold all", i)
 		matlab.Command(cmd)
 	}
-}
-
-func CreateAntennasForNetwork(system *deployment.DropSystem, bsids vlib.VectorI) {
-	systemAntennas = make(map[int]*antenna.SettingAAS)
-	// sectorBW := 360.0 / float64(nSectors)
-	for _, i := range bsids {
-		temp := antenna.NewAAS()
-		*temp = defaultAAS
-		// temp.Set(str)
-		// temp.Set(defaultAAS.Get())
-		systemAntennas[i] = temp
-		systemAntennas[i].FreqHz = CarriersGHz[0] * 1.e9
-		// systemAntennas[i].HBeamWidth = 65
-
-		systemAntennas[i].HTiltAngle = secangles[vlib.ModInt(i, 3)]
-		fmt.Println(system.Nodes[bsids[i]].Direction)
-
-		if nSectors == 1 {
-			systemAntennas[i].Omni = true
-		} else {
-			systemAntennas[i].Omni = false
-		}
-		systemAntennas[i].CreateElements(system.Nodes[bsids[i]].Location)
-
-		hgain := vlib.NewVectorF(360)
-		cnt := 0
-		cmd := `delta=pi/180;
-		phaseangle=0:delta:2*pi-delta;`
-		matlab.Command(cmd)
-		for d := 0; d < 360; d++ {
-			hgain[cnt] = systemAntennas[i].ElementDirectionHGain(float64(d))
-			cnt++
-		}
-
-		matlab.Export("gain"+strconv.Itoa(i), hgain)
-
-		cmd = fmt.Sprintf("polar(phaseangle,gain%d);hold all", i)
-		matlab.Command(cmd)
-	}
-}
-
-func DumpMap2CSV(fname string, arg interface{}) {
-	if reflect.TypeOf(arg).Kind() != reflect.Map {
-		log.Println("Unable to Dump: Not Map interface")
-		return
-	}
-
-	arrayData := reflect.ValueOf(arg)
-
-	w, fer := os.Create(fname)
-	if fer != nil {
-		log.Print("Error Creating CSV file ", fer)
-	}
-	cwr := csv.NewWriter(w)
-	// var record [4]string
-
-	cwr.Comma = '\t'
-	// w.WriteString("%NodeID\tFreqHz\tX\tY\tSINR\n")
-
-	// once := false
-	// counter := 0
-
-	// for _, metric := range arrayData.Elem() {
-	// count := arrayData.Len()
-	// for i := 0; i < count; i++ {
-	mapkeys := arrayData.MapKeys()
-	once := true
-	for _, key := range mapkeys {
-		metric := arrayData.MapIndex(key).Interface()
-
-		if once {
-			headers, _ := vlib.Struct2Header(metric)
-			w.WriteString("% " + strings.Join(headers, "\t") + "\n")
-			once = false
-		}
-		// fmt.Printf("\nkey is %v ", key.Interface())
-		// fmt.Printf("\nMETRIC is %v ", metric.Interface())
-		// if counter < 10 {
-		data, _ := vlib.Struct2Strings(metric)
-		// }
-		// counter++
-
-		// temp.AppendAtEnd(metric[f].BestRSRP - (metric[f].N0))
-		// SINR.AppendAtEnd(metric.BestSINR)
-		// loc := singlecell.Nodes[metric.RxNodeID].Location
-		// record := strings.Split(fmt.Sprintf("%d\t%f\t%f\t%f\t%f", metric.RxNodeID, metric.FreqInGHz, loc.X, loc.Y, metric.BestSINR), "\t")
-		// fmt.Print(data)
-		cwr.Write(data)
-		// if counter < 10 {
-		// 	fmt.Printf("\nrxid=%d indx %d Freq %f Value %v, %f", rxid, f, metric[f].FreqInGHz, metric[f].BestSINR, SINR[metric[f].FreqInGHz])
-		// }
-	} // }
-
-	cwr.Flush()
-	w.Close()
 }

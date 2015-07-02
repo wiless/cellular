@@ -2,6 +2,7 @@ package cellular
 
 import (
 	"log"
+	"math"
 
 	"github.com/wiless/cellular/antenna"
 
@@ -10,12 +11,11 @@ import (
 	"github.com/wiless/vlib"
 )
 
-type AntennaOfTxNode func(txnodeID int) antenna.SettingAAS
-
 type WSystem struct {
 	FrequencyGHz float64
 	BandwidthMHz float64
 	NoisePSDdBm  float64
+	ActiveCells  vlib.VectorI
 }
 
 func NewWSystem() WSystem {
@@ -24,6 +24,8 @@ func NewWSystem() WSystem {
 	result.NoisePSDdBm = -173.9
 	return result
 }
+
+type AntennaOfTxNode func(txnodeID int) antenna.SettingAAS
 
 /// EvaluteMetric iteratively calls the path-loss m
 func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss.Model, rxid int, afn AntennaOfTxNode) []LinkMetric {
@@ -65,8 +67,11 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss
 				nlinks++
 				link.TxNodeIDs.AppendAtEnd(txnodeID)
 
-				antenna := afn(txnodeID)
-				antenna.FreqHz = f * 1.0e9
+				ant := afn(txnodeID)
+				ant.FreqHz = f * 1.0e9
+				ant.Centre = txnode.Location
+				ant.HTiltAngle = txnode.Direction
+				ant.CreateElements(txnode.Location)
 				// log.Println(txnode.Orientation)
 				// antenna.HTiltAngle, antenna.VTiltAngle = txnode.Orientation[0], txnode.Orientation[1]
 				// antenna.CreateElements(txnode.Location)
@@ -75,7 +80,8 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss
 				//txnode.Location.Z = txnode.Height
 				// model.LossInDb3D(txnode.Location, rxnode.Location)
 				lossDb, _ := model.LossInDb3D(txnode.Location, rxnode.Location, f)
-				aasgain, _, _ := antenna.AASGain(rxnode.Location)
+				aasgain, _, _ := ant.AASGain(rxnode.Location)
+
 				rxRSRP := vlib.Db(aasgain) + txnode.TxPowerDBm - lossDb
 				link.TxNodesRSRP.AppendAtEnd(rxRSRP)
 
@@ -149,10 +155,14 @@ func (w WSystem) EvaluteLinkMetric(singlecell *deployment.DropSystem, model path
 	txnodeTypes := singlecell.GetTxNodeNames()
 
 	var alltxNodeIds vlib.VectorI
-	for i := 0; i < len(txnodeTypes); i++ {
-		alltxNodeIds.AppendAtEnd(singlecell.GetNodeIDs(txnodeTypes[i])...)
+	if w.ActiveCells.Size() == 0 {
+
+		for i := 0; i < len(txnodeTypes); i++ {
+			alltxNodeIds.AppendAtEnd(singlecell.GetNodeIDs(txnodeTypes[i])...)
+		}
+	} else {
+		alltxNodeIds = w.ActiveCells
 	}
-	// fmt.Println("All txnodes are  : ", alltxNodeIds)
 
 	if rxnode.FreqGHz.Contains(systemFrequencyGHz) {
 
@@ -175,18 +185,51 @@ func (w WSystem) EvaluteLinkMetric(singlecell *deployment.DropSystem, model path
 				nlinks++
 				link.TxNodeIDs.AppendAtEnd(txnodeID)
 
-				antenna := afn(txnodeID)
-				antenna.FreqHz = systemFrequencyGHz * 1.0e9
+				ant := afn(txnodeID)
+				ant.Centre = txnode.Location
+				ant.FreqHz = systemFrequencyGHz * 1.0e9
 				// log.Println(txnode.Orientation)
 				// antenna.HTiltAngle, antenna.VTiltAngle = txnode.Orientation[0], txnode.Orientation[1]
 				// antenna.CreateElements(txnode.Location)
 				//	log.Println("Checking Locations of Tx and Rx : ", txnode.Location, rxnode.Location)
 				// lossDb := model.LossInDb(distance)
-				//txnode.Location.Z = txnode.Height
+				//txnode.Location.Z = txnqodeth.Height
 				// model.LossInDb3D(txnode.Location, rxnode.Location)
-				lossDb, _ := model.LossInDb3D(txnode.Location, rxnode.Location, systemFrequencyGHz)
-				aasgain, _, _ := antenna.AASGain(rxnode.Location)
+				// if rxid == 401 {
+				// fmt.Println(txnode)
+				// fmt.Printf("\nRXNODE %d , Received Antenna Gain BS-%d distance is %f ", rxid, txnodeID)
+				// fmt.Printf("\n TxNode Location :  %v \n Antenna location %v \n Rx Location ", txnode.Location, ant.Centre, rxnode.Location)
+
+				// dist, thetaH, thetaV := vlib.RelativeGeo(txnode.Location, rxnode.Location)
+				// dist, thetaH, thetaV := ant.Centre(ant.Location, rxnode.Location)
+				// ant.CreateElements(txnode.Location)
+				// fmt.Println("\nAntenna External w.r.t TX ", dist, thetaH, thetaV)
+				// dist, thetaH, thetaV = vlib.RelativeGeo(ant.Centre, rxnode.Location)
+				// fmt.Println("\nAntenna External w.r.t Antenna Centre", dist, thetaH, thetaV)
+				// elementLocations := ant.GetElements()
+				// for i, v := range elementLocations {
+				// 	dist, thetaH, thetaV = vlib.RelativeGeo(v, rxnode.Location)
+				// 	fmt.Printf("\nAntenna Elements %d @ %v \n Metrics  w.r.t Antenna Centre : %f %f %f", i, v, dist, thetaH, thetaV)
+				// }
+				// // }
+				lossDb, plerr := model.LossInDb3D(txnode.Location, rxnode.Location, systemFrequencyGHz)
+				if !plerr {
+					log.Fatal("Cannot work")
+				}
+
+				aasgain, _, _ := ant.AASGain(rxnode.Location)
+
+				// fmt.Printf("\nOther values are aas=%v,txpower=%v,Ploss=%v , PLERROR =%v", vlib.Db(aasgain), txnode.TxPowerDBm, lossDb, plerr)
 				rxRSRP := vlib.Db(aasgain) + txnode.TxPowerDBm - lossDb
+				// fmt.Printf("\n Distance is %f", dist)
+				// fmt.Printf("\n Angle is H,V %f,%f", thetaH, thetaV)
+
+				// fmt.Printf("\n Storing RSRP for %d is %v", txnodeID, rxRSRP)
+
+				if math.IsInf(rxRSRP, 0) {
+					log.Panicln("=============%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+				}
+
 				link.TxNodesRSRP.AppendAtEnd(rxRSRP)
 
 			} else {

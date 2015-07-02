@@ -66,10 +66,6 @@ func (d DropParameter) MarshalJSON() ([]byte, error) {
 	return fx, rerr
 }
 
-const (
-	OMNIDIRECTION float64 = 9990
-)
-
 type NodeType struct {
 	Name       string
 	Hmin       float64
@@ -115,7 +111,7 @@ func (c DropType) String() string {
 }
 
 type DropSystem struct {
-	*dDropSetting
+	*DropSetting
 	Nodes  map[int]Node
 	lastID int
 }
@@ -130,8 +126,8 @@ func (d *DropSystem) UnmarshalJSON(jsondata []byte) error {
 	dec.Decode(&customobject)
 	d.lastID = int(customobject["LastID"].(float64))
 
-	d.dDropSetting = NewDropSetting()
-	ms.Decode(customobject["DropSetting"], d.dDropSetting)
+	d.DropSetting = NewDropSetting()
+	ms.Decode(customobject["DropSetting"], d.DropSetting)
 
 	type obj struct {
 		ID      int
@@ -154,7 +150,7 @@ func (d *DropSystem) MarshalJSON() ([]byte, error) {
 	enc := json.NewEncoder(bfr)
 	bfr.WriteString(`{`)
 	bfr.WriteString(`"DropSetting":`)
-	enc.Encode(d.dDropSetting)
+	enc.Encode(d.DropSetting)
 	// fmt.Printf("\nSettings %s", bfr.Bytes())
 	bfr.WriteString(`,"Nodes":[`)
 
@@ -194,14 +190,15 @@ type Area struct {
 	Dimensions vlib.VectorF
 }
 
-type dDropSetting struct {
+type DropSetting struct {
 	NodeTypes []NodeType
+	Centre    vlib.Location3D
 	// minDistance    map[NodePair]float64 `json:"-"`
 	CoverageRegion Area // For circular its just radius, Rectangular, its length, width
 	isInitialized  bool
 }
 
-func (d *dDropSetting) NodeCount(ntype string) int {
+func (d *DropSetting) NodeCount(ntype string) int {
 	for _, val := range d.NodeTypes {
 		if val.Name == ntype {
 			return val.Count
@@ -210,7 +207,7 @@ func (d *dDropSetting) NodeCount(ntype string) int {
 	return -1
 }
 
-func (d *dDropSetting) GetNodeIndex(ntype string) int {
+func (d *DropSetting) GetNodeIndex(ntype string) int {
 	for indx, val := range d.NodeTypes {
 		if val.Name == ntype {
 
@@ -220,7 +217,7 @@ func (d *dDropSetting) GetNodeIndex(ntype string) int {
 	return -1
 }
 
-func (d *dDropSetting) SetNodeCount(ntype string, count int) {
+func (d *DropSetting) SetNodeCount(ntype string, count int) {
 
 	// fmt.Println(d.NodeTypeLookup)
 	// fmt.Println(d.NodeTypes)
@@ -233,7 +230,7 @@ func (d *dDropSetting) SetNodeCount(ntype string, count int) {
 
 }
 
-func (d *dDropSetting) SetCoverage(area Area) {
+func (d *DropSetting) SetCoverage(area Area) {
 	d.CoverageRegion = area
 }
 
@@ -265,7 +262,7 @@ func (d *DropSystem) NewNode(ntype string) *Node {
 }
 
 //Set NodeTypes of typename(s) as Transmit Capabilities
-func (d *dDropSetting) SetTxNodeNames(typename ...string) {
+func (d *DropSetting) SetTxNodeNames(typename ...string) {
 
 	for i := 0; i < len(d.NodeTypes); i++ {
 		found, _ := vlib.Contains(typename, d.NodeTypes[i].Name)
@@ -276,7 +273,7 @@ func (d *dDropSetting) SetTxNodeNames(typename ...string) {
 }
 
 //Set NodeTypes of typename(s) as Receive Capabilities
-func (d *dDropSetting) SetRxNodeNames(typename ...string) {
+func (d *DropSetting) SetRxNodeNames(typename ...string) {
 
 	for i := 0; i < len(d.NodeTypes); i++ {
 		found, _ := vlib.Contains(typename, d.NodeTypes[i].Name)
@@ -287,7 +284,7 @@ func (d *dDropSetting) SetRxNodeNames(typename ...string) {
 
 }
 
-func (d *dDropSetting) GetNodeTypesOfMode(mode TxRxMode) []string {
+func (d *DropSetting) GetNodeTypesOfMode(mode TxRxMode) []string {
 	result := make([]string, 0, len(d.NodeTypes))
 	cnt := 0
 	for _, val := range d.NodeTypes {
@@ -301,12 +298,12 @@ func (d *dDropSetting) GetNodeTypesOfMode(mode TxRxMode) []string {
 }
 
 //Returns the  name of the nodetypes which are configured as Transmit capabilities
-func (d *dDropSetting) GetTxNodeNames() []string {
+func (d *DropSetting) GetTxNodeNames() []string {
 	return d.GetNodeTypesOfMode(TransmitOnly)
 }
 
 //Returns the  name of the nodetypes which are configured as Receive capabilities
-func (d *dDropSetting) GetRxNodeNames() []string {
+func (d *DropSetting) GetRxNodeNames() []string {
 	return d.GetNodeTypesOfMode(ReceiveOnly)
 }
 
@@ -329,20 +326,20 @@ func NewNodeType(name string, heights ...float64) *NodeType {
 	return result
 }
 
-func (d *DropSystem) SetSetting(setting *dDropSetting) {
-	d.dDropSetting = setting
+func (d *DropSystem) SetSetting(setting *DropSetting) {
+	d.DropSetting = setting
 }
 
-func (d DropSystem) GetSetting() *dDropSetting {
-	return d.dDropSetting
+func (d DropSystem) GetSetting() *DropSetting {
+	return d.DropSetting
 }
 
-func (d *dDropSetting) AddNodeType(ntype NodeType) {
+func (d *DropSetting) AddNodeType(ntype NodeType) {
 
 	d.NodeTypes = append(d.NodeTypes, ntype)
 }
 
-func (d *dDropSetting) SetDefaults() {
+func (d *DropSetting) SetDefaults() {
 	d.SetCoverage(CircularCoverage(100))
 
 	bs := *NewNodeType("BS", 20)
@@ -352,13 +349,13 @@ func (d *dDropSetting) SetDefaults() {
 
 }
 
-func NewDropSetting() *dDropSetting {
-	result := new(dDropSetting)
+func NewDropSetting() *DropSetting {
+	result := new(DropSetting)
 	result.isInitialized = false
 	return result
 }
 
-func (d *dDropSetting) Init() {
+func (d *DropSetting) Init() {
 	// d.NodeCount = make(map[string]int)
 	// d.NodeMap = make(map[string]NodeType)
 	d.isInitialized = true
@@ -370,7 +367,7 @@ func (d *dDropSetting) Init() {
 }
 
 func (d *DropSystem) Init() {
-	d.dDropSetting.Init()
+	d.DropSetting.Init()
 	d.Nodes = make(map[int]Node)
 	count := 0
 
@@ -635,6 +632,22 @@ func HexRandU(centre complex128, hexRadius float64, Npoints int, rdegree float64
 	return result
 }
 
+// % In the code, I will create a hexagon centered at (0,0) with radius R.
+// % The snipplets can be used in mobile capacity predicts and general
+// % systems level simulation of cellular networks.
+func HexGridRandU(GridCentre complex128, hexCellCount int, hexRadius float64, NperHexCell int, rdegree float64) vlib.VectorC {
+
+	var result vlib.VectorC
+	hexCenters := HexGrid(hexCellCount, vlib.FromCmplx(GridCentre), hexRadius, rdegree)
+	for indx, bsloc := range hexCenters {
+		log.Printf("Deployed for cell %d ", indx)
+		ulocation := HexRandU(bsloc.Cmplx(), hexRadius, NperHexCell, 30)
+		result = append(result, ulocation...)
+	}
+
+	return result
+}
+
 func HexVertices(centre complex128, length float64, degree float64) vlib.VectorC {
 	result := vlib.NewVectorC(6)
 	// degree := 0.0
@@ -782,6 +795,15 @@ func RectangularEqPoints(centre complex128, length, angle float64, N int) vlib.V
 	return result
 }
 
+func (d *DropSystem) GetNodesOfType(ntype string) []Node {
+	nids := d.GetNodeIDs(ntype)
+	result := make([]Node, nids.Size())
+	for i, val := range nids {
+		result[i] = d.Nodes[val]
+	}
+	return result
+}
+
 /// Simplest point for origin centred, rectangular region of length size
 func RandPointR(size float64) complex128 {
 	return RectangularPoint(ORIGIN, size, size, 0)
@@ -795,38 +817,45 @@ func RectangularCoverage(length float64) Area {
 	return Area{Rectangular, vlib.VectorF{length, length}}
 }
 
-func (d *DropSystem) GetNodeIDs(ntype string) vlib.VectorI {
-	indx := d.GetNodeIndex(ntype)
-	if indx != -1 {
-		return d.NodeTypes[indx].NodeIDs
+func (d *DropSystem) GetNodeIDs(ntypes ...string) vlib.VectorI {
+
+	ncount := 0
+	for _, ntype := range ntypes {
+		ncount += d.NodeCount(ntype)
 	}
-	return vlib.NewVectorI(0)
+	// result := vlib.NewVectorI(ncount)
+	var result vlib.VectorI
+	for _, ntype := range ntypes {
+		indx := d.GetNodeIndex(ntype)
+
+		if indx != -1 {
+			result.AppendAtEnd(d.NodeTypes[indx].NodeIDs...)
+		}
+	}
+
+	return result
 }
 
 // wlocation = deployment.RectangularEqPoints(wappos, 50, rand.Float64()*360, WAPNodes)
 // 	wlocation = deployment.AnnularRingPoints(deployment.ORIGIN, 100, 200, WAPNodes)
 // 	wlocation = deployment.AnnularRingEqPoints(deployment.ORIGIN, 200, WAPNodes)
 
-func (d *DropSystem) Drop(dp *DropParameter, result *vlib.VectorC) error {
+func (d *DropSystem) Drop(dp *DropParameter) (vlib.VectorC, error) {
 	switch dp.Type {
 	case Circular:
 		locations := CircularPoints(dp.Centre.Cmplx(), dp.Radius, dp.NCount)
-		result = &locations
-		return nil
+		return locations, nil
 	case Rectangular:
 		locations := RectangularEqPoints(dp.Centre.Cmplx(), dp.Radius, dp.RotationDegree, dp.NCount)
-		result = &locations
-		return nil
+		return locations, nil
 	case Hexagonal:
 		locations := HexRandU(dp.Centre.Cmplx(), dp.Radius, dp.NCount, 0)
-		result = &locations
-		return nil
+		return locations, nil
 	case Annular:
 		locations := AnnularRingPoints(dp.Centre.Cmplx(), dp.InnerRadius, dp.Radius, dp.NCount)
-		result = &locations
-		return nil
+		return locations, nil
 	default:
-		return errors.New("Unknown DropType")
+		return nil, errors.New("Unknown DropType")
 	}
 }
 
@@ -846,4 +875,7 @@ const (
 	ReceiveOnly
 	Duplex
 	Inactive
+)
+const (
+	OMNIDIRECTION float64 = 9990
 )

@@ -48,7 +48,7 @@ type SettingAAS struct {
 	VBeamWidth, HBeamWidth           float64
 	SLAV                             float64
 	ESpacingVFactor, ESpacingHFactor float64
-	Centre                           vlib.Location3D `json:"-"`
+	Centre                           vlib.Location3D
 	weightVector                     vlib.VectorC
 	AASArrayType                     ArrayType
 	CurveWidthInDegree               float64
@@ -133,6 +133,7 @@ func (params *SettingAAS) GetLamda() float64 {
 func (params *SettingAAS) CreateLinearElements(centre vlib.Location3D) {
 
 	if params.N == 0 {
+		log.Panicln("Antenna:Create Elements - ZERO   !!")
 		return
 	}
 	params.Centre = centre
@@ -141,16 +142,22 @@ func (params *SettingAAS) CreateLinearElements(centre vlib.Location3D) {
 	// dh := params.ESpacingHFactor * params.lamda
 	params.elementLocations = make([]vlib.Location3D, params.N)
 	// = dropLinearNodes(params.N, dv, 0)
-	rotateTilt := GetEJtheta(params.VTiltAngle) // cmplx.Exp(complex(0, -(params.VTiltAngle)*math.Pi/180.0))
+	//rotateTilt := GetEJtheta(params.VTiltAngle) // cmplx.Exp(complex(0, -(params.VTiltAngle)*math.Pi/180.0))
 	for i := 0; i < params.N; i++ {
 		params.elementLocations[i].X = centre.X
 		params.elementLocations[i].Y = centre.Y
 		params.elementLocations[i].Z = centre.Z + dv*float64(i) - float64(params.N-1)*dv/2.0
 
-		rotatedpos := params.elementLocations[i].Cmplx() * rotateTilt
-		params.elementLocations[i].FromCmplx(rotatedpos)
+		// rotatedpos := params.elementLocations[i].Cmplx() * rotateTilt
+		// params.elementLocations[i].FromCmplx(rotatedpos)
 	}
-	// fmt.Printf("\n AAS Elem %d locations :  %v", params.N, params.elementLocations)
+
+	// for i := 0; i < params.N; i++ {
+	// 	params.elementLocations[i].X += centre.X
+	// 	params.elementLocations[i].Y += centre.Y
+
+	// }
+
 	params.weightVector = params.FindWeights(params.BeamTilt)
 }
 
@@ -278,7 +285,9 @@ func (params *SettingAAS) AASGain(dest vlib.Location3D) (gain float64, effective
 
 	// fmt.Printf("\n Weights : %v", w)
 	for i := 0; i < params.N; i++ {
-		dist, thetaH, thetaV := vlib.RelativeGeo(params.elementLocations[i], dest)
+		// dist, thetaH, thetaV := vlib.RelativeGeo(params.elementLocations[i], dest)
+		dist, thetaH, thetaV := vlib.RelativeGeo(params.Centre, dest)
+
 		// dist= cmplx.Abs(params.elementLocations[i].Cmplx()-dest.Cmplx())
 		aGain := complex((params.ElementEffectiveGain(thetaH, thetaV)), 0)
 		_, phaseDelay[i] = (math.Modf(2 * math.Pi * dist / params.lamda))

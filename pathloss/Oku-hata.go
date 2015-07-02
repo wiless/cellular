@@ -28,7 +28,9 @@ func (w OkumuraHata) LossInDbNodes(txnode, rxnode deployment.Node, freqGHz float
 func (w OkumuraHata) LossInDb3D(src, dest vlib.Location3D, freqGHz float64) (plDb float64, valid bool) {
 	FreqMHz := freqGHz * 1.0e3
 	distance := src.DistanceFrom(dest) / 1.0e3
+
 	var result float64
+	result = -1
 	if FreqMHz >= 150 && FreqMHz < 1500 && distance > 0.05 {
 		var Ch float64
 		// Ch = 0.8 + (1.1*math.Log10(FreqMHz)-0.7)*dest.Z - 1.56*math.Log10(FreqMHz)

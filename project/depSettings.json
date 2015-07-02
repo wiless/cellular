@@ -1,58 +1,10 @@
 {
 	"NodeTypes": [
 		{
-			"Name": "BS0",
+			"Name": "BS",
 			"Hmin": 30,
 			"Hmax": 30,
-			"Count": 7,
-			"NodeIDs": [],
-			"Params": {
-				"Centre": {
-					"X": 0,
-					"Y": 0,
-					"Z": 0
-				},
-				"InnerRadius": 0,
-				"InnerRotationDegree": 0,
-				"NCount": 0,
-				"Radius": 0,
-				"Randomnoss": false,
-				"RotationDegree": 0,
-				"Type": 0
-			},
-			"TxPowerDBm": 0,
-			"Direction": 0,
-			"TxRxMode": 0
-		},
-		{
-			"Name": "BS1",
-			"Hmin": 30,
-			"Hmax": 30,
-			"Count": 7,
-			"NodeIDs": [],
-			"Params": {
-				"Centre": {
-					"X": 0,
-					"Y": 0,
-					"Z": 0
-				},
-				"InnerRadius": 0,
-				"InnerRotationDegree": 0,
-				"NCount": 0,
-				"Radius": 0,
-				"Randomnoss": false,
-				"RotationDegree": 0,
-				"Type": 0
-			},
-			"TxPowerDBm": 0,
-			"Direction": 0,
-			"TxRxMode": 0
-		},
-		{
-			"Name": "BS2",
-			"Hmin": 30,
-			"Hmax": 30,
-			"Count": 7,
+			"Count": 19,
 			"NodeIDs": [],
 			"Params": {
 				"Centre": {
@@ -76,7 +28,7 @@
 			"Name": "UE",
 			"Hmin": 1.1,
 			"Hmax": 1.1,
-			"Count": 3850,
+			"Count": 10450,
 			"NodeIDs": [],
 			"Params": {
 				"Centre": {
