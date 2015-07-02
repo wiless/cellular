@@ -1,0 +1,23 @@
+{
+	"uid": "",
+	"NodeID": 0,
+	"FreqHz": 0.4,
+	"N": 1,
+	"Nodes": 360,
+	"Omni": false,
+	"MfileName": "output.m",
+	"VTiltAngle": 12,
+	"HTiltAngle": 0,
+	"BeamTilt": 0,
+	"DisableBeamTit": false,
+	"HoldOn": false,
+	"VBeamWidth": 15,
+	"HBeamWidth": 65,
+	"SLAV": 30,
+	"ESpacingVFactor": 0.5,
+	"ESpacingHFactor": 0,
+	"AASArrayType": 0,
+	"CurveWidthInDegree": 30,
+	"CurveRadius": 1,
+	"GainDb": 10
+}
