@@ -3,21 +3,21 @@ load table400.dat
 load uelocations.dat 
 load bslocations.dat
 % 
-% load antennalocations.dat
-% antennalocations=antennalocations(:,2:end);
+ load antennalocations.dat
+ antennalocations=antennalocations(:,2:end);
 
 
-x=fileread('antennaArray.json');
-antennas=JSON.parse(x);
-antennalocations=[];
+%x=fileread('antennaArray.json');
+%antennas=JSON.parse(x);
+%antennalocations=[];
  
-for k=1:length(antennas)
-antennalocations(k,:)=[antennas{k}.SettingAAS.Centre.X antennas{k}.SettingAAS.Centre.Y];
-end
+%for k=1:length(antennas)
+%antennalocations(k,:)=[antennas{k}.SettingAAS.Centre.X antennas{k}.SettingAAS.Centre.Y];
+%end
 
 stable400=sortrows(table400,1);
 rows=length(stable400);
-stable400=[stable400 uelocations(1:rows,2) uelocations(1:rows,3) radtodeg(angle(uelocations(1:rows,2)+i*uelocations(1:rows,3)))];
+stable400=[stable400 uelocations(1:rows,2) uelocations(1:rows,3) angle(uelocations(1:rows,2)+i*uelocations(1:rows,3))*180/pi];
 
 figure
 % sp=plot(stable400(:,10),stable400(:,11),'m.')
@@ -28,7 +28,7 @@ figure
 syssinr=stable400(:,8);
 % % FILTER positive SINR users only
      stable400=stable400(find(stable400(:,8)>-3),:);
-%      stable400=stable400(find(stable400(:,8)<=30),:)
+      %stable400=stable400(find(stable400(:,8)<=10),:)
 figure 
 cdfplot(syssinr)
 figure(1)

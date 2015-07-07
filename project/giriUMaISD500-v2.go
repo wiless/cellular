@@ -64,7 +64,7 @@ func main() {
 
 	seedvalue := time.Now().Unix()
 	/// comment the below line to have different seed everytime
-	seedvalue = 0
+	// seedvalue = 0
 	rand.Seed(seedvalue)
 
 	var plmodel pathloss.OkumuraHata
@@ -77,6 +77,8 @@ func main() {
 	// singlecell.SetAllNodeProperty("UE", "AntennaType", 1)
 	singlecell.SetAllNodeProperty("UE", "FreqGHz", CarriersGHz)
 	layerBS := []string{"BS0", "BS1", "BS2"}
+	layer2BS := []string{"OBS0", "OBS1", "OBS2"}
+
 	var bsids vlib.VectorI
 
 	for indx, bs := range layerBS {
@@ -88,6 +90,17 @@ func main() {
 		fmt.Printf("\n %s : %v", bs, newids)
 
 	}
+
+	for indx, bs := range layer2BS {
+		singlecell.SetAllNodeProperty(bs, "FreqGHz", CarriersGHz)
+		singlecell.SetAllNodeProperty(bs, "TxPowerDBm", 22.0)
+		singlecell.SetAllNodeProperty(bs, "Direction", secangles[indx])
+		newids := singlecell.GetNodeIDs(bs)
+		bsids.AppendAtEnd(newids...)
+		fmt.Printf("\n %s : %v", bs, newids)
+
+	}
+
 	CreateAntennas(singlecell, bsids)
 	vlib.SaveStructure(systemAntennas, "antennaArray.json", true)
 	vlib.SaveStructure(singlecell.GetSetting(), "dep.json", true)
@@ -116,11 +129,6 @@ func main() {
 		fmt.Fprintf(fid, "%% ID\tX\tY\tZ\tPower\tdirection")
 		for _, id := range bsids {
 			node := singlecell.Nodes[id]
-			// if id%7 == 0 {
-			// 	node.TxPowerDBm = 0
-			// } else {
-			// 	node.TxPowerDBm = 44
-			// }
 			fmt.Fprintf(fid, "\n %d \t %f \t %f \t %f \t %f \t %f ", id, node.Location.X, node.Location.Y, node.Location.Z, node.TxPowerDBm, node.Direction)
 
 		}
@@ -139,7 +147,8 @@ func main() {
 	baseCells = baseCells.Scale(nCells)
 
 	// wsystem.ActiveCells.AppendAtEnd(baseCells.Add(4)...)
-	// wsystem.ActiveCells.AppendAtEnd(baseCells.Add(1)...)
+	//wsystem.ActiveCells.AppendAtEnd(baseCells.Add(1)...)
+	//wsystem.ActiveCells.AppendAtEnd(baseCells.Add(4)...)
 
 	// cell := 2
 	// startid := 0 + nUEPerCell*(cell)
@@ -233,6 +242,17 @@ func DeployLayer1(system *deployment.DropSystem) {
 			newnodetype.Mode = deployment.TransmitOnly
 			setting.AddNodeType(newnodetype)
 
+			newnodetype = deployment.NodeType{Name: "OBS0", Hmin: 30.0, Hmax: 30.0, Count: nCells}
+			newnodetype.Mode = deployment.TransmitOnly
+			setting.AddNodeType(newnodetype)
+
+			newnodetype = deployment.NodeType{Name: "OBS1", Hmin: 30.0, Hmax: 30.0, Count: nCells}
+			newnodetype.Mode = deployment.TransmitOnly
+			setting.AddNodeType(newnodetype)
+
+			newnodetype = deployment.NodeType{Name: "OBS2", Hmin: 30.0, Hmax: 30.0, Count: nCells}
+			newnodetype.Mode = deployment.TransmitOnly
+			setting.AddNodeType(newnodetype)
 			/// NodeType should come from API calls
 			newnodetype = deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 1.1, Count: nUEPerCell * nCells}
 			newnodetype.Mode = deployment.ReceiveOnly
@@ -261,6 +281,15 @@ func DeployLayer1(system *deployment.DropSystem) {
 	system.SetAllNodeLocation("BS0", vlib.Location3DtoVecC(clocations))
 	system.SetAllNodeLocation("BS1", vlib.Location3DtoVecC(clocations))
 	system.SetAllNodeLocation("BS2", vlib.Location3DtoVecC(clocations))
+
+	var loc vlib.Location3D
+	loc.X = 1500
+	loc.Y = 1500
+	loc.Z = 0
+	clocations = deployment.HexGrid(nCells, loc, CellRadius, 30)
+	system.SetAllNodeLocation("OBS0", vlib.Location3DtoVecC(clocations))
+	system.SetAllNodeLocation("OBS1", vlib.Location3DtoVecC(clocations))
+	system.SetAllNodeLocation("OBS2", vlib.Location3DtoVecC(clocations))
 
 	// Workaround else should come from API calls or Databases
 	uelocations := LoadUELocations(system)
