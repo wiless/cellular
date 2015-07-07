@@ -28,7 +28,7 @@ var secangles = vlib.VectorF{0.0, 120.0, -120.0}
 var CellRadius = 500.0
 var nUEPerCell = 400
 var nCells = 19
-var CarriersGHz = vlib.VectorF{.4}
+var CarriersGHz = vlib.VectorF{1.8}
 
 func init() {
 
@@ -138,7 +138,7 @@ func main() {
 	baseCells := vlib.VectorI{0, 1, 2}
 	baseCells = baseCells.Scale(nCells)
 
-	wsystem.ActiveCells.AppendAtEnd(baseCells.Add(4)...)
+	// wsystem.ActiveCells.AppendAtEnd(baseCells.Add(4)...)
 	// wsystem.ActiveCells.AppendAtEnd(baseCells.Add(1)...)
 
 	// cell := 2
