@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/wiless/vlib"
 	"math"
 	"math/rand"
 	"time"
+
+	"github.com/wiless/vlib"
 )
 
 var matlab *vlib.Matlab
@@ -22,8 +23,8 @@ func main() {
 	// var pathloss pathloss.PathLossType
 	sloss := vlib.RandNF(variance)
 
-	fmt.Println("Loss = ", sloss)
-	fmt.Println("Loss = ", ShadowMatrix)
+	fmt.Println("SLvar = ", sloss)
+	fmt.Println("IIDShadow = ", ShadowMatrix)
 
 	/// find corr per unit mtr
 	point := vlib.Point{0, 0}
@@ -35,7 +36,7 @@ func main() {
 		correlation[cnt] = variance * math.Exp(-delta/CorrD)
 		cnt++
 	}
-	fmt.Println("Loss = ", correlation)
+	fmt.Println("SLfromOrigin = ", correlation)
 
 	fmt.Println("done")
 }

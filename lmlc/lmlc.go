@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"log"
+	"math"
+	"math/cmplx"
 	"math/rand"
 	"os"
 	"strconv"
@@ -27,7 +29,7 @@ var secangles = vlib.VectorF{0.0, 120.0, -120.0}
 // var nSectors = 1
 var CellRadius = 3500.0
 var nUEPerCell = 1000
-var nCells = 1
+var nCells = 19
 var CarriersGHz = vlib.VectorF{0.7}
 
 func init() {
@@ -257,7 +259,12 @@ func DeployLayer1(system *deployment.DropSystem) {
 
 			/// NodeType should come from API calls
 
-			newnodetype = deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 1.1, Count: nUEPerCell * nCells}
+			// newnodetype = deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 1.1, Count: 550 * nCells}
+			newnodetype = deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 1.1, Count: 550 * nCells}
+			newnodetype.Mode = deployment.ReceiveOnly
+			setting.AddNodeType(newnodetype)
+
+			newnodetype = deployment.NodeType{Name: "VUE", Hmin: 1.1, Hmax: 1.1, Count: 450 * nCells}
 			newnodetype.Mode = deployment.ReceiveOnly
 			setting.AddNodeType(newnodetype)
 
@@ -296,26 +303,22 @@ func DeployLayer1(system *deployment.DropSystem) {
 
 	// Workaround else should come from API calls or Databases
 	uelocations := LoadUELocationsGP(system)
+	vuelocations := LoadUELocationsV(system)
+
 	system.SetAllNodeLocation("UE", uelocations)
+	system.SetAllNodeLocation("VUE", vuelocations)
 
 }
 
-func LoadUELocationsGP(system *deployment.DropSystem) vlib.VectorC {
+func LoadUELocationsV(system *deployment.DropSystem) vlib.VectorC {
 
-	GPradius := 500.0
-	GPusers := 550
 	NVillages := 3
 	VillageRadius := 200.0
 	NUEsPerVillage := 150
 	var uelocations vlib.VectorC
 	hexCenters := deployment.HexGrid(nCells, vlib.FromCmplx(deployment.ORIGIN), CellRadius, 30)
 	for indx, bsloc := range hexCenters {
-		log.Printf("Deployed for cell %d ", indx)
-
-		// AT GP
-		uelocation := deployment.CircularPoints(bsloc.Cmplx(), GPradius, GPusers)
-		// ulocation := deployment.HexRandU(bsloc.Cmplx(), CellRadius, nUEPerCell, 30)
-		uelocations = append(uelocations, uelocation...)
+		log.Printf("Deployed for cell %d at %v", indx, bsloc.Cmplx())
 
 		// 3-Villages in the HEXAGONAL CELL
 		//villageCentre := deployment.HexRandU(bsloc, CellRadius, NVillages, 30)
@@ -323,21 +326,40 @@ func LoadUELocationsGP(system *deployment.DropSystem) vlib.VectorC {
 		// Practical
 		//	villageCentres := deployment.AnnularRingPoints(bsloc.Cmplx(), 1500, 3000, NVillages)
 		villageCentres := deployment.AnnularRingEqPoints(bsloc.Cmplx(), 1500, NVillages) /// On
-		offset := vlib.ToVectorC(vlib.RandUFVec(NVillages).ShiftAndScale(1.0, 1.0))      // add U(0,1500)  scale by 1 to 2.0
-		rotate := vlib.RandUFVec(NVillages).ShiftAndScale(-0.5, 30.0)                    // +- 10 degrees
+		offset := vlib.RandUFVec(NVillages).ShiftAndScale(0, 500.0)                      // add U(0,1500)  scale by 1 to 2.0
+		rotate := vlib.RandUFVec(NVillages).ScaleAndShift(math.Pi/10, -math.Pi/20)       // +- 10 degrees
 		_ = rotate
 		_ = offset
 		for v, vc := range villageCentres {
-			log.Printf("Adding Village %d of GP %d , Users %d ", v, indx, NUEsPerVillage)
 			// Add Random offset U(0,1500) Radially
-			c := vc * offset[v] * vlib.GetEJtheta(rotate[v])
-			// c = c * vlib.GetEJtheta(rotate[v])
+			c := vc + cmplx.Rect(offset[v], cmplx.Phase(vc)+rotate[v])
+
+			log.Printf("Adding Village %d of GP %d , VC  %v , Radial Offset %v , %v, RESULT %v", v, indx, vc, offset[v], (cmplx.Phase(vc)), cmplx.Abs(c-vc))
+
 			villageUElocations := deployment.CircularPoints(c, VillageRadius, NUEsPerVillage)
 
 			uelocations = append(uelocations, villageUElocations...)
 		}
+
+	}
+
+	return uelocations
+}
+
+func LoadUELocationsGP(system *deployment.DropSystem) vlib.VectorC {
+
+	GPradius := 500.0
+	GPusers := 550
+
+	var uelocations vlib.VectorC
+	hexCenters := deployment.HexGrid(nCells, vlib.FromCmplx(deployment.ORIGIN), CellRadius, 30)
+	for indx, bsloc := range hexCenters {
+		log.Printf("Deployed for cell %d at %v", indx, bsloc.Cmplx())
+
+		// AT GP
+		uelocation := deployment.CircularPoints(bsloc.Cmplx(), GPradius, GPusers)
 		// ulocation := deployment.HexRandU(bsloc.Cmplx(), CellRadius, nUEPerCell, 30)
-		// uelocations = append(uelocations, ulocation...)
+		uelocations = append(uelocations, uelocation...)
 
 	}
 
