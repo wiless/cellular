@@ -32,3 +32,14 @@ colorbar
 view(2)
 title(f)
 end
+hold on
+plot(bslocations(:,2),bslocations(:,3),'*k','MarkerSize',10)
+hold on;
+plot(antennalocations(:,1),antennalocations(:,2),'Or','MarkerSize',10) 
+
+% stable=stable(1:500,:);
+bestbsid=stable(:,7);
+
+drawPolyGon(complex(bslocations(:,2),bslocations(:,3)),ISD/2);
+drawPolyGon(complex(antennalocations(:,1),antennalocations(:,2)),ISD/2,'b');
+ 

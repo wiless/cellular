@@ -45,7 +45,7 @@ func init() {
 	// defaultAAS.FreqHz = CarriersGHz[0]
 	// defaultAAS.BeamTilt = 0
 	// defaultAAS.DisableBeamTit = false
-	defaultAAS.VTiltAngle = 10
+	defaultAAS.VTiltAngle = 15
 	// defaultAAS.ESpacingVFactor = .5
 	// defaultAAS.HTiltAngle = 0
 	// defaultAAS.MfileName = "output.m"
