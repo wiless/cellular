@@ -47,7 +47,7 @@ func (w OkumuraHata) LossInDb3D(src, dest vlib.Location3D, freqGHz float64) (plD
 
 			result = 69.55 + 26.16*math.Log10(FreqMHz) - 13.82*math.Log10(src.Z) - Ch + (44.9-6.55*math.Log10(src.Z))*math.Log10(distance)
 			if once == false {
-				log.Println("Case  A: 150<f<1500, d>50m")
+				log.Println("Case  A: 150<f<1500, d>50m", FreqMHz)
 				once = true
 			}
 

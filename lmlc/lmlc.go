@@ -29,7 +29,7 @@ var secangles = vlib.VectorF{0.0, 120.0, -120.0}
 // var nSectors = 1
 var CellRadius = 3500.0
 var nUEPerCell = 1000
-var nCells = 19
+var nCells = 7
 var CarriersGHz = vlib.VectorF{0.7}
 
 func init() {
@@ -45,7 +45,7 @@ func init() {
 	// defaultAAS.FreqHz = CarriersGHz[0]
 	// defaultAAS.BeamTilt = 0
 	// defaultAAS.DisableBeamTit = false
-	// defaultAAS.VTiltAngle = 30
+	defaultAAS.VTiltAngle = 10
 	// defaultAAS.ESpacingVFactor = .5
 	// defaultAAS.HTiltAngle = 0
 	// defaultAAS.MfileName = "output.m"
@@ -72,12 +72,15 @@ func main() {
 	var plmodel pathloss.OkumuraHata
 	// var plmodel walfisch.WalfischIke
 	// var plmodel pathloss.SimplePLModel
+	// var plmodel pathloss.RMa
 
 	DeployLayer1(&singlecell)
 
 	// singlecell.SetAllNodeProperty("BS", "AntennaType", 0)
 	// singlecell.SetAllNodeProperty("UE", "AntennaType", 1)
 	singlecell.SetAllNodeProperty("UE", "FreqGHz", CarriersGHz)
+	singlecell.SetAllNodeProperty("VUE", "FreqGHz", CarriersGHz)
+
 	layerBS := []string{"BS0", "BS1", "BS2"}
 	// layer2BS := []string{"OBS0", "OBS1", "OBS2"}
 
@@ -108,16 +111,19 @@ func main() {
 	vlib.SaveStructure(singlecell.GetSetting(), "dep.json", true)
 	vlib.SaveStructure(singlecell.Nodes, "nodelist.json", true)
 
+	rxtypes := []string{"VUE"}
+
 	/// System 1 @ 400MHz
 	// Dump UE locations
 	{
 
 		fid, _ := os.Create("uelocations.dat")
-		ueids := singlecell.GetNodeIDs("UE")
+		ueids := singlecell.GetNodeIDs(rxtypes...)
+		log.Println("RXid range : ", ueids[0], ueids[len(ueids)-1], len(ueids))
 		fmt.Fprintf(fid, "%% ID\tX\tY\tZ")
 		for _, id := range ueids {
 			node := singlecell.Nodes[id]
-			fmt.Fprintf(fid, "\n %d \t %f \t %f \t %f \t %f \t %f ", id, node.Location.X, node.Location.Y, node.Location.Z)
+			fmt.Fprintf(fid, "\n %d \t %f \t %f \t %f ", id, node.Location.X, node.Location.Y, node.Location.Z)
 
 		}
 		fid.Close()
@@ -142,7 +148,8 @@ func main() {
 	wsystem.BandwidthMHz = 20
 	wsystem.FrequencyGHz = CarriersGHz[0]
 
-	rxids := singlecell.GetNodeIDs("UE")
+	rxids := singlecell.GetNodeIDs(rxtypes...)
+	log.Println("RXid range : ", rxids[0], rxids[len(rxids)-1], len(rxids))
 	RxMetrics400 := make(map[int]cell.LinkMetric)
 
 	baseCells := vlib.VectorI{0, 1, 2}
@@ -259,7 +266,12 @@ func DeployLayer1(system *deployment.DropSystem) {
 
 			/// NodeType should come from API calls
 
-			// newnodetype = deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 1.1, Count: 550 * nCells}
+			/// ALL NODES considered
+			// newnodetype = deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 1.1, Count: nUEPerCell * nCells}
+			// newnodetype.Mode = deployment.ReceiveOnly
+			// setting.AddNodeType(newnodetype)
+
+			/// SPLIT USERS
 			newnodetype = deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 1.1, Count: 550 * nCells}
 			newnodetype.Mode = deployment.ReceiveOnly
 			setting.AddNodeType(newnodetype)
@@ -292,15 +304,6 @@ func DeployLayer1(system *deployment.DropSystem) {
 	system.SetAllNodeLocation("BS1", vlib.Location3DtoVecC(clocations))
 	system.SetAllNodeLocation("BS2", vlib.Location3DtoVecC(clocations))
 
-	// var loc vlib.Location3D
-	// loc.X = 1500
-	// loc.Y = 1500
-	// loc.Z = 0
-	// clocations = deployment.HexGrid(nCells, loc, CellRadius, 30)
-	// system.SetAllNodeLocation("OBS0", vlib.Location3DtoVecC(clocations))
-	// system.SetAllNodeLocation("OBS1", vlib.Location3DtoVecC(clocations))
-	// system.SetAllNodeLocation("OBS2", vlib.Location3DtoVecC(clocations))
-
 	// Workaround else should come from API calls or Databases
 	uelocations := LoadUELocationsGP(system)
 	vuelocations := LoadUELocationsV(system)
@@ -308,12 +311,14 @@ func DeployLayer1(system *deployment.DropSystem) {
 	system.SetAllNodeLocation("UE", uelocations)
 	system.SetAllNodeLocation("VUE", vuelocations)
 
+	// uelocations = append(uelocations, vuelocations...)
+	// system.SetAllNodeLocation("UE", uelocations)
 }
 
 func LoadUELocationsV(system *deployment.DropSystem) vlib.VectorC {
 
 	NVillages := 3
-	VillageRadius := 200.0
+	VillageRadius := 1500.0
 	NUEsPerVillage := 150
 	var uelocations vlib.VectorC
 	hexCenters := deployment.HexGrid(nCells, vlib.FromCmplx(deployment.ORIGIN), CellRadius, 30)
@@ -325,14 +330,14 @@ func LoadUELocationsV(system *deployment.DropSystem) vlib.VectorC {
 
 		// Practical
 		//	villageCentres := deployment.AnnularRingPoints(bsloc.Cmplx(), 1500, 3000, NVillages)
-		villageCentres := deployment.AnnularRingEqPoints(bsloc.Cmplx(), 1500, NVillages) /// On
+		villageCentres := deployment.AnnularRingEqPoints(bsloc.Cmplx(), 2500, NVillages) /// On
 		offset := vlib.RandUFVec(NVillages).ShiftAndScale(0, 500.0)                      // add U(0,1500)  scale by 1 to 2.0
 		rotate := vlib.RandUFVec(NVillages).ScaleAndShift(math.Pi/10, -math.Pi/20)       // +- 10 degrees
 		_ = rotate
 		_ = offset
 		for v, vc := range villageCentres {
 			// Add Random offset U(0,1500) Radially
-			c := vc + cmplx.Rect(offset[v], cmplx.Phase(vc)+rotate[v])
+			c := vc + cmplx.Rect(offset[v], cmplx.Phase(vc)) // +rotate[v]
 
 			log.Printf("Adding Village %d of GP %d , VC  %v , Radial Offset %v , %v, RESULT %v", v, indx, vc, offset[v], (cmplx.Phase(vc)), cmplx.Abs(c-vc))
 
@@ -348,7 +353,7 @@ func LoadUELocationsV(system *deployment.DropSystem) vlib.VectorC {
 
 func LoadUELocationsGP(system *deployment.DropSystem) vlib.VectorC {
 
-	GPradius := 500.0
+	GPradius := 550.0
 	GPusers := 550
 
 	var uelocations vlib.VectorC
