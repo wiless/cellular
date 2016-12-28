@@ -6,7 +6,7 @@
 	"Nodes": 360,
 	"Omni": false,
 	"MfileName": "output.m",
-	"VTiltAngle": 12,
+	"VTiltAngle": 0,
 	"HTiltAngle": 0,
 	"BeamTilt": 0,
 	"DisableBeamTit": false,

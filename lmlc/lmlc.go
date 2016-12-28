@@ -29,23 +29,26 @@ var secangles = vlib.VectorF{0.0, 120.0, -120.0}
 // var nSectors = 1
 var CellRadius = 3500.0
 var nUEPerCell = 1000
-var nCells = 7
+var nCells = 19
 var CarriersGHz = vlib.VectorF{0.7}
+var RXTYPES = []string{"UE"}
+var VTILT = 0.0
 
 func init() {
 
 	defaultAAS.SetDefault()
 
+	log.Printf("BEFORE LOAD %#v", defaultAAS)
 	//	vlib.LoadStructure("omni.json", &defaultAAS)
 	vlib.LoadStructure("sector.json", &defaultAAS)
 
 	// vlib.LoadStructure("omni.json", defaultAAS)
 
 	// defaultAAS.N = 1
-	// defaultAAS.FreqHz = CarriersGHz[0]
+	defaultAAS.FreqHz = CarriersGHz[0]
 	// defaultAAS.BeamTilt = 0
 	// defaultAAS.DisableBeamTit = false
-	defaultAAS.VTiltAngle = 15
+	defaultAAS.VTiltAngle = VTILT
 	// defaultAAS.ESpacingVFactor = .5
 	// defaultAAS.HTiltAngle = 0
 	// defaultAAS.MfileName = "output.m"
@@ -56,7 +59,8 @@ func init() {
 	// defaultAAS.CurveWidthInDegree = 30.0
 	// defaultAAS.CurveRadius = 1.00
 
-	// vlib.SaveStructure(defaultAAS, "defaultAAS.json", true)
+	log.Printf("After LOAD %#v", defaultAAS)
+	vlib.SaveStructure(defaultAAS, "defaultAAS.json", true)
 }
 
 func main() {
@@ -78,8 +82,12 @@ func main() {
 
 	// singlecell.SetAllNodeProperty("BS", "AntennaType", 0)
 	// singlecell.SetAllNodeProperty("UE", "AntennaType", 1)
+
+	// CASE A1 & A2
 	singlecell.SetAllNodeProperty("UE", "FreqGHz", CarriersGHz)
-	singlecell.SetAllNodeProperty("VUE", "FreqGHz", CarriersGHz)
+
+	// CASE B1 & B2
+	// singlecell.SetAllNodeProperty("VUE", "FreqGHz", CarriersGHz)
 
 	layerBS := []string{"BS0", "BS1", "BS2"}
 	// layer2BS := []string{"OBS0", "OBS1", "OBS2"}
@@ -111,7 +119,7 @@ func main() {
 	vlib.SaveStructure(singlecell.GetSetting(), "dep.json", true)
 	vlib.SaveStructure(singlecell.Nodes, "nodelist.json", true)
 
-	rxtypes := []string{"VUE"}
+	rxtypes := RXTYPES
 
 	/// System 1 @ 400MHz
 	// Dump UE locations
@@ -167,14 +175,13 @@ func main() {
 	for _, rxid := range rxids {
 		metric := wsystem.EvaluteLinkMetric(&singlecell, &plmodel, rxid, myfunc)
 		RxMetrics400[rxid] = metric
-
 	}
 
 	// Dump antenna nodelocations
 	{
 		fid, _ := os.Create("antennalocations.dat")
 
-		fmt.Fprintf(fid, "%% ID\tX\tY\tZ\tHDirection\tHWidth")
+		fmt.Fprintf(fid, "%% ID\tX\tY\tZ\tHDirection\tHWidth\tVTilt")
 		for _, id := range bsids {
 			ant := myfunc(id)
 			// if id%7 == 0 {
@@ -182,7 +189,7 @@ func main() {
 			// } else {
 			// 	node.TxPowerDBm = 44
 			// }
-			fmt.Fprintf(fid, "\n %d \t %f \t %f \t %f \t %f \t %f ", id, ant.Centre.X, ant.Centre.Y, ant.Centre.Z, ant.HTiltAngle, ant.HBeamWidth)
+			fmt.Fprintf(fid, "\n %d \t %f \t %f \t %f \t %f \t %f \t %f", id, ant.Centre.X, ant.Centre.Y, ant.Centre.Z, ant.HTiltAngle, ant.HBeamWidth, ant.VTiltAngle)
 
 		}
 		fid.Close()
@@ -271,14 +278,19 @@ func DeployLayer1(system *deployment.DropSystem) {
 			// newnodetype.Mode = deployment.ReceiveOnly
 			// setting.AddNodeType(newnodetype)
 
-			/// SPLIT USERS
-			newnodetype = deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 1.1, Count: 550 * nCells}
+			/// CASE A1 & A2
+			newnodetype = deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 1.1, Count: nUEPerCell * nCells}
 			newnodetype.Mode = deployment.ReceiveOnly
 			setting.AddNodeType(newnodetype)
 
-			newnodetype = deployment.NodeType{Name: "VUE", Hmin: 1.1, Hmax: 1.1, Count: 450 * nCells}
-			newnodetype.Mode = deployment.ReceiveOnly
-			setting.AddNodeType(newnodetype)
+			/// CASE B1 & B2
+			// newnodetype = deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 1.1, Count: 550 * nCells}
+			// newnodetype.Mode = deployment.ReceiveOnly
+			// setting.AddNodeType(newnodetype)
+
+			// newnodetype = deployment.NodeType{Name: "VUE", Hmin: 1.1, Hmax: 1.1, Count: 450 * nCells}
+			// newnodetype.Mode = deployment.ReceiveOnly
+			// setting.AddNodeType(newnodetype)
 
 			// vlib.SaveStructure(setting, "depSettings.json", true)
 
@@ -304,21 +316,24 @@ func DeployLayer1(system *deployment.DropSystem) {
 	system.SetAllNodeLocation("BS1", vlib.Location3DtoVecC(clocations))
 	system.SetAllNodeLocation("BS2", vlib.Location3DtoVecC(clocations))
 
-	// Workaround else should come from API calls or Databases
-	uelocations := LoadUELocationsGP(system)
-	vuelocations := LoadUELocationsV(system)
-
+	// CASE A1 & A2
+	uelocations := LoadUELocations(system)
 	system.SetAllNodeLocation("UE", uelocations)
-	system.SetAllNodeLocation("VUE", vuelocations)
 
-	// uelocations = append(uelocations, vuelocations...)
+	// CASE B1 & B2
+	// Workaround else should come from API calls or Databases
+	// uelocations := LoadUELocationsGP(system)
+	// vuelocations := LoadUELocationsV(system)
 	// system.SetAllNodeLocation("UE", uelocations)
+	// system.SetAllNodeLocation("VUE", vuelocations)
+
 }
 
 func LoadUELocationsV(system *deployment.DropSystem) vlib.VectorC {
 
 	NVillages := 3
-	VillageRadius := 1500.0
+	VillageRadius := 500.0
+	VillageDistance := 2500.0
 	NUEsPerVillage := 150
 	var uelocations vlib.VectorC
 	hexCenters := deployment.HexGrid(nCells, vlib.FromCmplx(deployment.ORIGIN), CellRadius, 30)
@@ -330,9 +345,9 @@ func LoadUELocationsV(system *deployment.DropSystem) vlib.VectorC {
 
 		// Practical
 		//	villageCentres := deployment.AnnularRingPoints(bsloc.Cmplx(), 1500, 3000, NVillages)
-		villageCentres := deployment.AnnularRingEqPoints(bsloc.Cmplx(), 2500, NVillages) /// On
-		offset := vlib.RandUFVec(NVillages).ShiftAndScale(0, 500.0)                      // add U(0,1500)  scale by 1 to 2.0
-		rotate := vlib.RandUFVec(NVillages).ScaleAndShift(math.Pi/10, -math.Pi/20)       // +- 10 degrees
+		villageCentres := deployment.AnnularRingEqPoints(bsloc.Cmplx(), VillageDistance, NVillages) /// On
+		offset := vlib.RandUFVec(NVillages).ShiftAndScale(0, 500.0)                                 // add U(0,1500)  scale by 1 to 2.0
+		rotate := vlib.RandUFVec(NVillages).ScaleAndShift(math.Pi/10, -math.Pi/20)                  // +- 10 degrees
 		_ = rotate
 		_ = offset
 		for v, vc := range villageCentres {
@@ -396,8 +411,7 @@ func myfunc(nodeID int) antenna.SettingAAS {
 		log.Printf("No antenna created !! for %d ", nodeID)
 		return defaultAAS
 	} else {
-
-		// fmt.Printf("\nNode %d , Omni= %v, Dirction=%v and center is %v", nodeID, obj.Omni, obj.HTiltAngle, obj.Centre)
+		// fmt.Printf("\nNode %d , Omni= %v, Dirction=(H%v,V%v) and center is %v", nodeID, obj.Omni, obj.HTiltAngle, obj.VTiltAngle, obj.Centre)
 		return *obj
 	}
 }
@@ -414,9 +428,14 @@ func CreateAntennas(system deployment.DropSystem, bsids vlib.VectorI) {
 	// vlib.LoadStructure("sector.json", sector)
 
 	for _, i := range bsids {
+
 		systemAntennas[i] = antenna.NewAAS()
+
+		// copy(systemAntennas[i], defaultAAS)
 		vlib.LoadStructure("sector.json", systemAntennas[i])
-		systemAntennas[i].FreqHz = CarriersGHz[0] * 1.e9
+		*systemAntennas[i] = defaultAAS
+
+		// systemAntennas[i].FreqHz = CarriersGHz[0] * 1.e9
 		// systemAntennas[i].HBeamWidth = 65
 
 		systemAntennas[i].HTiltAngle = system.Nodes[i].Direction
@@ -430,13 +449,15 @@ func CreateAntennas(system deployment.DropSystem, bsids vlib.VectorI) {
 		// fmt.Printf("\nType=%s , BSid=%d : System Antenna : %v", system.Nodes[i].Type, i, systemAntennas[i].Centre)
 
 		hgain := vlib.NewVectorF(360)
+		// vgain := vlib.NewVectorF(360)
+
 		cnt := 0
 		cmd := `delta=pi/180;
 		phaseangle=0:delta:2*pi-delta;`
 		matlab.Command(cmd)
 		for d := 0; d < 360; d++ {
 			hgain[cnt] = systemAntennas[i].ElementDirectionHGain(float64(d))
-			// hgain[cnt] = systemAntennas[i].ElementEffectiveGain(thetaH, thetaV)
+			//		hgain[cnt] = systemAntennas[i].ElementEffectiveGain(thetaH, thetaV)
 			cnt++
 		}
 

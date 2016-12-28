@@ -188,6 +188,7 @@ func (w WSystem) EvaluteLinkMetric(singlecell *deployment.DropSystem, model path
 				ant := afn(txnodeID)
 				ant.Centre = txnode.Location
 				ant.FreqHz = systemFrequencyGHz * 1.0e9
+				// log.Println("Antenna for ", txnodeID, ant.VTiltAngle)
 				// log.Println(txnode.Orientation)
 				// antenna.HTiltAngle, antenna.VTiltAngle = txnode.Orientation[0], txnode.Orientation[1]
 				// antenna.CreateElements(txnode.Location)
