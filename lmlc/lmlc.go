@@ -31,7 +31,7 @@ var CellRadius = 3500.0
 var nUEPerCell = 1000
 var nCells = 19
 var CarriersGHz = vlib.VectorF{0.7}
-var RXTYPES = []string{"UE"}
+var RXTYPES = []string{"VUE", "UE"}
 var VTILT = 0.0
 
 func init() {
@@ -87,7 +87,7 @@ func main() {
 	singlecell.SetAllNodeProperty("UE", "FreqGHz", CarriersGHz)
 
 	// CASE B1 & B2
-	// singlecell.SetAllNodeProperty("VUE", "FreqGHz", CarriersGHz)
+	singlecell.SetAllNodeProperty("VUE", "FreqGHz", CarriersGHz)
 
 	layerBS := []string{"BS0", "BS1", "BS2"}
 	// layer2BS := []string{"OBS0", "OBS1", "OBS2"}
@@ -279,18 +279,18 @@ func DeployLayer1(system *deployment.DropSystem) {
 			// setting.AddNodeType(newnodetype)
 
 			/// CASE A1 & A2
-			newnodetype = deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 1.1, Count: nUEPerCell * nCells}
+			// newnodetype = deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 1.1, Count: nUEPerCell * nCells}
+			// newnodetype.Mode = deployment.ReceiveOnly
+			// setting.AddNodeType(newnodetype)
+
+			/// CASE B1 & B2
+			newnodetype = deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 1.1, Count: 550 * nCells}
 			newnodetype.Mode = deployment.ReceiveOnly
 			setting.AddNodeType(newnodetype)
 
-			/// CASE B1 & B2
-			// newnodetype = deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 1.1, Count: 550 * nCells}
-			// newnodetype.Mode = deployment.ReceiveOnly
-			// setting.AddNodeType(newnodetype)
-
-			// newnodetype = deployment.NodeType{Name: "VUE", Hmin: 1.1, Hmax: 1.1, Count: 450 * nCells}
-			// newnodetype.Mode = deployment.ReceiveOnly
-			// setting.AddNodeType(newnodetype)
+			newnodetype = deployment.NodeType{Name: "VUE", Hmin: 1.1, Hmax: 1.1, Count: 450 * nCells}
+			newnodetype.Mode = deployment.ReceiveOnly
+			setting.AddNodeType(newnodetype)
 
 			// vlib.SaveStructure(setting, "depSettings.json", true)
 
@@ -317,23 +317,23 @@ func DeployLayer1(system *deployment.DropSystem) {
 	system.SetAllNodeLocation("BS2", vlib.Location3DtoVecC(clocations))
 
 	// CASE A1 & A2
-	uelocations := LoadUELocations(system)
-	system.SetAllNodeLocation("UE", uelocations)
+	// uelocations := LoadUELocations(system)
+	// system.SetAllNodeLocation("UE", uelocations)
 
 	// CASE B1 & B2
 	// Workaround else should come from API calls or Databases
-	// uelocations := LoadUELocationsGP(system)
-	// vuelocations := LoadUELocationsV(system)
-	// system.SetAllNodeLocation("UE", uelocations)
-	// system.SetAllNodeLocation("VUE", vuelocations)
+	uelocations := LoadUELocationsGP(system)
+	vuelocations := LoadUELocationsV(system)
+	system.SetAllNodeLocation("UE", uelocations)
+	system.SetAllNodeLocation("VUE", vuelocations)
 
 }
 
 func LoadUELocationsV(system *deployment.DropSystem) vlib.VectorC {
 
 	NVillages := 3
-	VillageRadius := 500.0
-	VillageDistance := 2500.0
+	VillageRadius := 200.0
+	VillageDistance := 1500.0
 	NUEsPerVillage := 150
 	var uelocations vlib.VectorC
 	hexCenters := deployment.HexGrid(nCells, vlib.FromCmplx(deployment.ORIGIN), CellRadius, 30)

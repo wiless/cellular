@@ -1,7 +1,6 @@
 %load nodeinfo.dat % NodeID,Freq,X,Y,SINR
 %nodeinfo =nodeinfo(find(mod(nodeinfo(:,7),2)==0),:);
 nodeinfo=nodecolortable;
-
 frequency= unique(nodeinfo(:,2))';
 for f=frequency
 nodeinfoTable=nodeinfo(find(nodeinfo(:,2)==f),:);

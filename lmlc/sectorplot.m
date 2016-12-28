@@ -20,30 +20,28 @@ stable=sortrows(table,1);
 rows=length(stable);
 stable=[stable uelocations(1:rows,2) uelocations(1:rows,3) angle(uelocations(1:rows,2)+i*uelocations(1:rows,3))*180/pi];
  
- 
-uepos=complex(uelocations(:,2),uelocations(:,3));
-DISTCOL=size(stable,2);
-for r=1:rows
-	bsloc=complex(bslocations(stable(r,7)+1,2),bslocations(stable(r,7)+1,3));
-    distance(r,1)=abs(uepos(r)-bsloc); 
 
-end
-    stable(:,DISTCOL+1)=distance;
+%uepos=complex(uelocations(:,2),uelocations(:,3));
+%DISTCOL=size(stable,2);
+%for r=1:rows
+%	bsloc=complex(bslocations(stable(r,7)+1,2),bslocations(stable(r,7)+1,3));
+%    distance(r,1)=abs(uepos(r)-bsloc); 
+% end
+% stable(:,DISTCOL+1)=distance;
 
 
 % CASE A1,B1,B2
-% nodecolortable=[uelocations(findx,1) stable(:,2) uelocations(findx,2:3) stable(:,8)];
+nodecolortable=[uelocations(:,1) stable(:,2) uelocations(:,2:3) stable(:,8)];
 
 % CASE A2
 % FILTER UE beyond 1000m from center
-findx=find(distance>1000); 
-stable=stable(findx,:);
-nodecolortable=[uelocations(findx,1) stable(:,2) uelocations(findx,2:3) stable(:,8)];
+%findx=find(distance>0); 
+%stable=stable(findx,:);
+%nodecolortable=[uelocations(findx,1) stable(:,2) uelocations(findx,2:3) stable(:,8)];
 
 
 
-figure
-
+% figure
 % sp=plot(stable(:,10),stable(:,11),'m.')
 % for k=1:(length(bslocations)/3)
 % plot(uelocations([1:400]+400*(k-1),2),uelocations([1:400]+400*(k-1),3),'.');
@@ -57,9 +55,10 @@ syssinr=stable(:,8);
     % stable=stable(find(stable(:,8)>-3),:);
       %stable=stable(find(stable(:,8)<=10),:)
 
-figure 
+figure(1) 
+
 cdfplot(syssinr)
-figure(1)
+figure(2)
 % [Nrows Ncols]=size(stable);
 % NUEsPerCell=100;
 % cell=3;
@@ -107,5 +106,5 @@ h=plot(sec0ues(:,1),sec0ues(:,2),'r*');hold on
 
 
 grid on
-
+figure(3)
 nodecolorplot
