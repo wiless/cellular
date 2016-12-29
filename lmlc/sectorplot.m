@@ -2,7 +2,7 @@ close all
 table=load('table700MHz.dat');
 load uelocations.dat 
 load bslocations.dat
-ISD=3500*2;
+ISD=3200*2;
 % 
  load antennalocations.dat
  antennalocations=antennalocations(:,2:end);
@@ -71,7 +71,7 @@ figure(2)
 %     stable(indx,Ncols+1:Ncols+3)=extracols;
 % end
 % 
-hold on;
+% hold on;
 
 plot(bslocations(:,2),bslocations(:,3),'*k','MarkerSize',10)
 hold on;
@@ -106,5 +106,5 @@ h=plot(sec0ues(:,1),sec0ues(:,2),'r*');hold on
 
 
 grid on
-figure(3)
+
 nodecolorplot

@@ -27,18 +27,26 @@ var singlecell deployment.DropSystem
 var secangles = vlib.VectorF{0.0, 120.0, -120.0}
 
 // var nSectors = 1
-var CellRadius = 3500.0
+var CellRadius = 3200.0
 var nUEPerCell = 1000
-var nCells = 19
+var nCells = 19 + 20
 var CarriersGHz = vlib.VectorF{0.7}
-var RXTYPES = []string{"VUE", "UE"}
+var RXTYPES = []string{"UE", "VUE", "MUE"}
 var VTILT = 0.0
+
+var NVillages = 3
+var VillageRadius = 400.0
+var VillageDistance = 2500.0
+
+var GPradius = 550.0
+var GPusers = 525
+var NUEsPerVillage = 125
+var NMobileUEs = 100
 
 func init() {
 
 	defaultAAS.SetDefault()
 
-	log.Printf("BEFORE LOAD %#v", defaultAAS)
 	//	vlib.LoadStructure("omni.json", &defaultAAS)
 	vlib.LoadStructure("sector.json", &defaultAAS)
 
@@ -59,7 +67,6 @@ func init() {
 	// defaultAAS.CurveWidthInDegree = 30.0
 	// defaultAAS.CurveRadius = 1.00
 
-	log.Printf("After LOAD %#v", defaultAAS)
 	vlib.SaveStructure(defaultAAS, "defaultAAS.json", true)
 }
 
@@ -83,11 +90,14 @@ func main() {
 	// singlecell.SetAllNodeProperty("BS", "AntennaType", 0)
 	// singlecell.SetAllNodeProperty("UE", "AntennaType", 1)
 
-	// CASE A1 & A2
-	singlecell.SetAllNodeProperty("UE", "FreqGHz", CarriersGHz)
+	rxnodeTypes := singlecell.GetNodeTypesOfMode(deployment.ReceiveOnly)
+	log.Println("Found these RX nodes ", rxnodeTypes)
 
+	for _, uetype := range rxnodeTypes {
+		singlecell.SetAllNodeProperty(uetype, "FreqGHz", CarriersGHz)
+	}
+	// CASE A1 & A2
 	// CASE B1 & B2
-	singlecell.SetAllNodeProperty("VUE", "FreqGHz", CarriersGHz)
 
 	layerBS := []string{"BS0", "BS1", "BS2"}
 	// layer2BS := []string{"OBS0", "OBS1", "OBS2"}
@@ -284,11 +294,15 @@ func DeployLayer1(system *deployment.DropSystem) {
 			// setting.AddNodeType(newnodetype)
 
 			/// CASE B1 & B2
-			newnodetype = deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 1.1, Count: 550 * nCells}
+			newnodetype = deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 1.1, Count: GPusers * nCells}
 			newnodetype.Mode = deployment.ReceiveOnly
 			setting.AddNodeType(newnodetype)
 
-			newnodetype = deployment.NodeType{Name: "VUE", Hmin: 1.1, Hmax: 1.1, Count: 450 * nCells}
+			newnodetype = deployment.NodeType{Name: "VUE", Hmin: 1.1, Hmax: 1.1, Count: NUEsPerVillage * NVillages * nCells}
+			newnodetype.Mode = deployment.ReceiveOnly
+			setting.AddNodeType(newnodetype)
+
+			newnodetype = deployment.NodeType{Name: "MUE", Hmin: 1.1, Hmax: 1.1, Count: NMobileUEs * nCells}
 			newnodetype.Mode = deployment.ReceiveOnly
 			setting.AddNodeType(newnodetype)
 
@@ -324,22 +338,21 @@ func DeployLayer1(system *deployment.DropSystem) {
 	// Workaround else should come from API calls or Databases
 	uelocations := LoadUELocationsGP(system)
 	vuelocations := LoadUELocationsV(system)
+	muelocations := LoadUELocations(system)
+
 	system.SetAllNodeLocation("UE", uelocations)
 	system.SetAllNodeLocation("VUE", vuelocations)
+	system.SetAllNodeLocation("MUE", muelocations)
 
 }
 
 func LoadUELocationsV(system *deployment.DropSystem) vlib.VectorC {
 
-	NVillages := 3
-	VillageRadius := 200.0
-	VillageDistance := 1500.0
-	NUEsPerVillage := 150
 	var uelocations vlib.VectorC
 	hexCenters := deployment.HexGrid(nCells, vlib.FromCmplx(deployment.ORIGIN), CellRadius, 30)
 	for indx, bsloc := range hexCenters {
-		log.Printf("Deployed for cell %d at %v", indx, bsloc.Cmplx())
-
+		// log.Printf("Deployed for cell %d at %v", indx, bsloc.Cmplx())
+		_ = indx
 		// 3-Villages in the HEXAGONAL CELL
 		//villageCentre := deployment.HexRandU(bsloc, CellRadius, NVillages, 30)
 
@@ -354,8 +367,8 @@ func LoadUELocationsV(system *deployment.DropSystem) vlib.VectorC {
 			// Add Random offset U(0,1500) Radially
 			c := vc + cmplx.Rect(offset[v], cmplx.Phase(vc)) // +rotate[v]
 
-			log.Printf("Adding Village %d of GP %d , VC  %v , Radial Offset %v , %v, RESULT %v", v, indx, vc, offset[v], (cmplx.Phase(vc)), cmplx.Abs(c-vc))
-
+			// log.Printf("Adding Village %d of GP %d , VC  %v , Radial Offset %v , %v, RESULT %v", v, indx, vc, offset[v], (cmplx.Phase(vc)), cmplx.Abs(c-vc))
+			log.Printf("Adding Village %d of GP %d  : %d users", v, indx, NUEsPerVillage)
 			villageUElocations := deployment.CircularPoints(c, VillageRadius, NUEsPerVillage)
 
 			uelocations = append(uelocations, villageUElocations...)
@@ -368,17 +381,13 @@ func LoadUELocationsV(system *deployment.DropSystem) vlib.VectorC {
 
 func LoadUELocationsGP(system *deployment.DropSystem) vlib.VectorC {
 
-	GPradius := 550.0
-	GPusers := 550
-
 	var uelocations vlib.VectorC
 	hexCenters := deployment.HexGrid(nCells, vlib.FromCmplx(deployment.ORIGIN), CellRadius, 30)
 	for indx, bsloc := range hexCenters {
-		log.Printf("Deployed for cell %d at %v", indx, bsloc.Cmplx())
+		log.Printf("Dropping GP %d UEs for cell %d", GPusers, indx)
 
 		// AT GP
 		uelocation := deployment.CircularPoints(bsloc.Cmplx(), GPradius, GPusers)
-		// ulocation := deployment.HexRandU(bsloc.Cmplx(), CellRadius, nUEPerCell, 30)
 		uelocations = append(uelocations, uelocation...)
 
 	}
@@ -392,8 +401,9 @@ func LoadUELocations(system *deployment.DropSystem) vlib.VectorC {
 	var uelocations vlib.VectorC
 	hexCenters := deployment.HexGrid(nCells, vlib.FromCmplx(deployment.ORIGIN), CellRadius, 30)
 	for indx, bsloc := range hexCenters {
-		log.Printf("Deployed for cell %d ", indx)
-		ulocation := deployment.HexRandU(bsloc.Cmplx(), CellRadius, nUEPerCell, 30)
+		log.Printf("Dropping Uniform %d UEs for cell %d", NMobileUEs, indx)
+
+		ulocation := deployment.HexRandU(bsloc.Cmplx(), CellRadius, NMobileUEs, 30)
 		// for i, v := range ulocation {
 		// 	ulocation[i] = v + bsloc.Cmplx()
 		// }
