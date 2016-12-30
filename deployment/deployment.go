@@ -30,6 +30,15 @@ type Node struct {
 	TxPowerDBm  float64
 	FreqGHz     vlib.VectorF
 	Mode        TxRxMode `json:"TxRxMode"`
+	alias       int
+}
+
+func (n Node) Alias() int {
+	return n.alias
+}
+
+func (n *Node) SetAlias(a int) {
+	n.alias = a
 }
 
 type DropParameter struct {
@@ -253,6 +262,7 @@ func (d *DropSystem) NewNode(ntype string) *Node {
 	}
 	// node.ID = notype.startID
 	node.ID = d.lastID
+	node.alias = node.ID
 	// fmt.Printf("\n Node Type is %#v", notype)
 	// fmt.Printf("\n Creating a Node of type %s , with ID %d for Coverage Type %s", ntype, node.id, d.CoverageRegion.CellType)
 

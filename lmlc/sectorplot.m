@@ -79,10 +79,12 @@ plot(antennalocations(:,1),antennalocations(:,2),'Or','MarkerSize',10)
 
 % stable=stable(1:500,:);
 bestbsid=stable(:,7);
-
 drawPolyGon(complex(bslocations(:,2),bslocations(:,3)),ISD/2);
 drawPolyGon(complex(antennalocations(:,1),antennalocations(:,2)),ISD/2,'b');
- 
+%  
+% clust1=20:37;
+% drawPolyGon(complex(bslocations(clust1,2),bslocations(clust1,3)),ISD/2,'g');
+% drawPolyGon(complex(antennalocations(clust1,1),antennalocations(clust1,2)),ISD/2,'g');
 
 nSectors=3; 
 nCells=size(bslocations,1)/nSectors;

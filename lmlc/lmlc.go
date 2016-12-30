@@ -27,10 +27,13 @@ var singlecell deployment.DropSystem
 var secangles = vlib.VectorF{0.0, 120.0, -120.0}
 
 // var nSectors = 1
+
 var CellRadius = 3200.0
 var nUEPerCell = 1000
-var nCells = 19 + 20
-var CarriersGHz = vlib.VectorF{0.7}
+var nCells = 37 + 24
+var trueCells = 19
+
+var CarriersGHz = vlib.VectorF{1.200}
 var RXTYPES = []string{"UE", "VUE", "MUE"}
 var VTILT = 0.0
 
@@ -39,9 +42,9 @@ var VillageRadius = 400.0
 var VillageDistance = 2500.0
 
 var GPradius = 550.0
-var GPusers = 525
-var NUEsPerVillage = 125
-var NMobileUEs = 100
+var GPusers = 10       //525
+var NUEsPerVillage = 5 //125
+var NMobileUEs = 10    // 100
 
 func init() {
 
@@ -219,6 +222,8 @@ func main() {
 	// }
 	// vlib.SaveStructure(RxMetrics1800, "metric1800MHz.json", true)
 	// DumpMap2CSV("table1800.dat", RxMetrics1800)
+	_, ids := deployment.HexWrapGrid(nCells, vlib.Origin3D, CellRadius, 30, 19)
+	matlab.Export("VirtualCellID", ids)
 
 	matlab.Close()
 
@@ -238,7 +243,8 @@ func main() {
 	// matlab.Export("AntennaGainDb", defaultAAS.GainDb)
 	// matlab.Command(fmt.Sprintf("legend %v", legendstring))
 	// matlab.Close()
-	fmt.Println("\n")
+	fmt.Println("\n ============================")
+
 }
 
 /// Calculate Pathloss
@@ -294,15 +300,15 @@ func DeployLayer1(system *deployment.DropSystem) {
 			// setting.AddNodeType(newnodetype)
 
 			/// CASE B1 & B2
-			newnodetype = deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 1.1, Count: GPusers * nCells}
+			newnodetype = deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 1.1, Count: GPusers * trueCells}
 			newnodetype.Mode = deployment.ReceiveOnly
 			setting.AddNodeType(newnodetype)
 
-			newnodetype = deployment.NodeType{Name: "VUE", Hmin: 1.1, Hmax: 1.1, Count: NUEsPerVillage * NVillages * nCells}
+			newnodetype = deployment.NodeType{Name: "VUE", Hmin: 1.1, Hmax: 1.1, Count: NUEsPerVillage * NVillages * trueCells}
 			newnodetype.Mode = deployment.ReceiveOnly
 			setting.AddNodeType(newnodetype)
 
-			newnodetype = deployment.NodeType{Name: "MUE", Hmin: 1.1, Hmax: 1.1, Count: NMobileUEs * nCells}
+			newnodetype = deployment.NodeType{Name: "MUE", Hmin: 1.1, Hmax: 1.1, Count: NMobileUEs * trueCells}
 			newnodetype.Mode = deployment.ReceiveOnly
 			setting.AddNodeType(newnodetype)
 
@@ -325,7 +331,8 @@ func DeployLayer1(system *deployment.DropSystem) {
 	// area := deployment.RectangularCoverage(600)
 	// deployment.DropSetting.SetCoverage(area)
 
-	clocations := deployment.HexGrid(nCells, vlib.Origin3D, CellRadius, 30)
+	// clocations := deployment.HexGrid(nCells, vlib.Origin3D, CellRadius, 30)
+	clocations, _ := deployment.HexWrapGrid(nCells, vlib.Origin3D, CellRadius, 30, 19)
 	system.SetAllNodeLocation("BS0", vlib.Location3DtoVecC(clocations))
 	system.SetAllNodeLocation("BS1", vlib.Location3DtoVecC(clocations))
 	system.SetAllNodeLocation("BS2", vlib.Location3DtoVecC(clocations))
@@ -349,7 +356,7 @@ func DeployLayer1(system *deployment.DropSystem) {
 func LoadUELocationsV(system *deployment.DropSystem) vlib.VectorC {
 
 	var uelocations vlib.VectorC
-	hexCenters := deployment.HexGrid(nCells, vlib.FromCmplx(deployment.ORIGIN), CellRadius, 30)
+	hexCenters := deployment.HexGrid(trueCells, vlib.FromCmplx(deployment.ORIGIN), CellRadius, 30)
 	for indx, bsloc := range hexCenters {
 		// log.Printf("Deployed for cell %d at %v", indx, bsloc.Cmplx())
 		_ = indx
@@ -382,7 +389,7 @@ func LoadUELocationsV(system *deployment.DropSystem) vlib.VectorC {
 func LoadUELocationsGP(system *deployment.DropSystem) vlib.VectorC {
 
 	var uelocations vlib.VectorC
-	hexCenters := deployment.HexGrid(nCells, vlib.FromCmplx(deployment.ORIGIN), CellRadius, 30)
+	hexCenters := deployment.HexGrid(trueCells, vlib.FromCmplx(deployment.ORIGIN), CellRadius, 30)
 	for indx, bsloc := range hexCenters {
 		log.Printf("Dropping GP %d UEs for cell %d", GPusers, indx)
 
@@ -399,7 +406,7 @@ func LoadUELocationsGP(system *deployment.DropSystem) vlib.VectorC {
 func LoadUELocations(system *deployment.DropSystem) vlib.VectorC {
 
 	var uelocations vlib.VectorC
-	hexCenters := deployment.HexGrid(nCells, vlib.FromCmplx(deployment.ORIGIN), CellRadius, 30)
+	hexCenters := deployment.HexGrid(trueCells, vlib.FromCmplx(deployment.ORIGIN), CellRadius, 30)
 	for indx, bsloc := range hexCenters {
 		log.Printf("Dropping Uniform %d UEs for cell %d", NMobileUEs, indx)
 
