@@ -2,7 +2,8 @@ close all
 table=load('table700MHz.dat');
 load uelocations.dat 
 load bslocations.dat
-ISD=3200*2;
+% ISD=3200*2;
+
 % 
  load antennalocations.dat
  antennalocations=antennalocations(:,2:end);

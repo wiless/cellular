@@ -19,6 +19,18 @@ import (
 	"github.com/wiless/vlib"
 )
 
+type MatInfo struct {
+	BaseID             int `json:"baseID"`
+	SecID              int `json:"secID"`
+	UserID             int `json:"userID"`
+	RSSI               float64
+	IfStation          vlib.VectorI `json:"ifStation"`
+	IfRSSI             vlib.VectorF `json:"ifRSSI"`
+	ThermalNoise       float64      `json:"thermalNoise"`
+	SINR               float64
+	RestOfInterference float64 `json:"restOfInterference"`
+}
+
 var matlab *vlib.Matlab
 var defaultAAS antenna.SettingAAS
 var systemAntennas map[int]*antenna.SettingAAS
@@ -26,15 +38,14 @@ var systemAntennas map[int]*antenna.SettingAAS
 var singlecell deployment.DropSystem
 var secangles = vlib.VectorF{0.0, 120.0, -120.0}
 
-// var nSectors = 1
+// var nUEPerCell = 1000
+var nCells = 19
+var trueCells = 1
 
-var CellRadius = 3200.0
-var nUEPerCell = 1000
-var nCells = 37 + 24
-var trueCells = 19
+var CellRadius float64 = 1000
 
-var CarriersGHz = vlib.VectorF{1.200}
-var RXTYPES = []string{"UE", "VUE", "MUE"}
+var CarriersGHz = vlib.VectorF{0.7}
+var RXTYPES = []string{"MUE"}
 var VTILT = 0.0
 
 var NVillages = 3
@@ -42,9 +53,9 @@ var VillageRadius = 400.0
 var VillageDistance = 2500.0
 
 var GPradius = 550.0
-var GPusers = 10       //525
-var NUEsPerVillage = 5 //125
-var NMobileUEs = 10    // 100
+var GPusers = 0        //525
+var NUEsPerVillage = 0 //125
+var NMobileUEs = 1000  // 100
 
 func init() {
 
@@ -185,6 +196,7 @@ func main() {
 	// endid := nUEPerCell * (cell + 1)
 	// cell0UE := rxids[startid:endid]
 	// log.Printf("\n ************** UEs of Cell %d := %v", cell, cell0UE)
+
 	for _, rxid := range rxids {
 		metric := wsystem.EvaluteLinkMetric(&singlecell, &plmodel, rxid, myfunc)
 		RxMetrics400[rxid] = metric
@@ -208,8 +220,52 @@ func main() {
 		fid.Close()
 
 	}
+
 	vlib.DumpMap2CSV("table700MHz.dat", RxMetrics400)
 	vlib.SaveStructure(RxMetrics400, "metric700MHz.json", true)
+
+	/// Code Dump for Throughput Calculation
+
+	// log.Printf("\n ************** UEs of Cell %d := %v", cell, cell0UE)
+	log.Println("RXID range ", rxids[0], rxids[len(rxids)-1])
+
+	// BaseID             int `json:"baseID"`
+	// SecID              int `json:"secID"`
+	// UserID             int `json:"userID"`
+	// RSSI               float64
+	// IfStation          vlib.VectorI `json:"ifStation"`
+	// IfRSSI             vlib.VectorF `json:"ifRSSI"`
+	// ThermalNoise       float64      `json:"thermalNoise"`
+	// SINR               float64
+	// RestOfInterference float64 `json:"restOfInterference"`
+
+	MatlabResult := make([]MatInfo, len(rxids))
+	for indx, rxid := range rxids {
+		metric := RxMetrics400[rxid]
+		var minfo MatInfo
+		minfo.UserID = metric.RxNodeID
+		minfo.SecID = 0 // metric.BestRSRPNode
+		minfo.BaseID = metric.BestRSRPNode
+		minfo.RSSI = 0 // normalized
+
+		MAXINTER := 8
+		minfo.IfStation = metric.TxNodeIDs[1:MAXINTER] // the first entry is best
+		var ifrssi vlib.VectorF
+		ifrssi = metric.TxNodesRSRP[1:]
+		ifrssi = ifrssi.Sub(metric.TxNodesRSRP[0])
+
+		residual := ifrssi[MAXINTER:]
+		residual = vlib.InvDbF(residual)
+		ifrssi = ifrssi[0:MAXINTER]
+
+		minfo.IfRSSI = ifrssi // the first entry is best
+		minfo.ThermalNoise = metric.N0
+		minfo.SINR = metric.BestSINR
+		minfo.RestOfInterference = vlib.Db(vlib.Sum(residual))
+
+		MatlabResult[indx] = minfo
+	}
+	vlib.SaveStructure(MatlabResult, "matlabdump.json", true)
 
 	// /// System 2 @ 1800MHz
 	// RxMetrics1800 := make(map[int]cell.LinkMetric)
@@ -222,8 +278,8 @@ func main() {
 	// }
 	// vlib.SaveStructure(RxMetrics1800, "metric1800MHz.json", true)
 	// DumpMap2CSV("table1800.dat", RxMetrics1800)
-	_, ids := deployment.HexWrapGrid(nCells, vlib.Origin3D, CellRadius, 30, 19)
-	matlab.Export("VirtualCellID", ids)
+	// _, ids := deployment.HexWrapGrid(nCells, vlib.Origin3D, CellRadius, 30, trueCells)
+	// matlab.Export("VirtualCellID", ids)
 
 	matlab.Close()
 
