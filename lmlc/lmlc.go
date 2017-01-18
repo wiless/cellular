@@ -42,8 +42,8 @@ var secangles = vlib.VectorF{0.0, 120.0, -120.0}
 var nCells = 19
 var trueCells = 1
 
-var CellRadius float64 = 1000
-
+var CellRadius float64 = 5774.0
+var TxPowerDbm float64 = 46.0
 var CarriersGHz = vlib.VectorF{0.7}
 var RXTYPES = []string{"MUE"}
 var VTILT = 0.0
@@ -55,7 +55,7 @@ var VillageDistance = 2500.0
 var GPradius = 550.0
 var GPusers = 0        //525
 var NUEsPerVillage = 0 //125
-var NMobileUEs = 1000  // 100
+var NMobileUEs = 1500  // 100
 
 func init() {
 
@@ -120,7 +120,7 @@ func main() {
 
 	for indx, bs := range layerBS {
 		singlecell.SetAllNodeProperty(bs, "FreqGHz", CarriersGHz)
-		singlecell.SetAllNodeProperty(bs, "TxPowerDBm", 43.0)
+		singlecell.SetAllNodeProperty(bs, "TxPowerDBm", TxPowerDbm)
 		singlecell.SetAllNodeProperty(bs, "Direction", secangles[indx])
 		newids := singlecell.GetNodeIDs(bs)
 		bsids.AppendAtEnd(newids...)
@@ -244,7 +244,7 @@ func main() {
 		metric := RxMetrics400[rxid]
 		var minfo MatInfo
 		minfo.UserID = metric.RxNodeID
-		minfo.SecID = 0 // metric.BestRSRPNode
+		minfo.SecID = int(math.Floor(float64(metric.BestRSRPNode) / float64(nCells)))
 		minfo.BaseID = metric.BestRSRPNode
 		minfo.RSSI = 0 // normalized
 
