@@ -32,7 +32,10 @@ stable=[stable uelocations(1:rows,2) uelocations(1:rows,3) angle(uelocations(1:r
 
 
 % CASE A1,B1,B2
-nodecolortable=[uelocations(:,1) stable(:,2) uelocations(:,2:3) stable(:,8)];
+% for SNR
+%nodecolortable=[uelocations(:,1) stable(:,2) uelocations(:,2:3) stable(:,6)-stable(:,4) ]; % getting SINR  else stable(:,8)
+% for SINR
+nodecolortable=[uelocations(:,1) stable(:,2) uelocations(:,2:3) stable(:,8) ]; % getting SINR  else stable(:,8)
 
 % CASE A2
 % FILTER UE beyond 1000m from center

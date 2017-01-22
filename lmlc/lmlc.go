@@ -39,10 +39,10 @@ var singlecell deployment.DropSystem
 var secangles = vlib.VectorF{0.0, 120.0, -120.0}
 
 // var nUEPerCell = 1000
-var nCells = 19
+var nCells = 19 + 42
 var trueCells = 1
 
-var CellRadius float64 = 5774.0
+var CellRadius float64 = 3450.0
 var TxPowerDbm float64 = 46.0
 var CarriersGHz = vlib.VectorF{0.7}
 var RXTYPES = []string{"MUE"}
@@ -55,7 +55,7 @@ var VillageDistance = 2500.0
 var GPradius = 550.0
 var GPusers = 0        //525
 var NUEsPerVillage = 0 //125
-var NMobileUEs = 1500  // 100
+var NMobileUEs = 1000  // 100
 
 func init() {
 
@@ -181,6 +181,9 @@ func main() {
 	wsystem.FrequencyGHz = CarriersGHz[0]
 
 	rxids := singlecell.GetNodeIDs(rxtypes...)
+	// bstypes := []string{"BS0", "BS1", "BS2"}
+	// rxids := singlecell.GetNodeIDs(bstypes...)
+
 	log.Println("RXid range : ", rxids[0], rxids[len(rxids)-1], len(rxids))
 	RxMetrics400 := make(map[int]cell.LinkMetric)
 
@@ -227,7 +230,6 @@ func main() {
 	/// Code Dump for Throughput Calculation
 
 	// log.Printf("\n ************** UEs of Cell %d := %v", cell, cell0UE)
-	log.Println("RXID range ", rxids[0], rxids[len(rxids)-1])
 
 	// BaseID             int `json:"baseID"`
 	// SecID              int `json:"secID"`
@@ -249,6 +251,10 @@ func main() {
 		minfo.RSSI = 0 // normalized
 
 		MAXINTER := 8
+		if metric.TxNodeIDs.Size() < MAXINTER {
+			MAXINTER = len(metric.TxNodeIDs) - 1
+		}
+		// log.Println("METRIC TxNodes ", metric.TxNodeIDs)
 		minfo.IfStation = metric.TxNodeIDs[1:MAXINTER] // the first entry is best
 		var ifrssi vlib.VectorF
 		ifrssi = metric.TxNodesRSRP[1:]
@@ -259,7 +265,7 @@ func main() {
 		ifrssi = ifrssi[0:MAXINTER]
 
 		minfo.IfRSSI = ifrssi // the first entry is best
-		minfo.ThermalNoise = metric.N0
+		minfo.ThermalNoise = metric.N0 - metric.TxNodesRSRP[0]
 		minfo.SINR = metric.BestSINR
 		minfo.RestOfInterference = vlib.Db(vlib.Sum(residual))
 
@@ -318,17 +324,18 @@ func DeployLayer1(system *deployment.DropSystem) {
 			// setting.SetCoverage(deployment.CircularCoverage(AreaRadius))
 
 			BSHEIGHT := 35.0
+			BSMode := deployment.TransmitOnly
 			/// NodeType should come from API calls
 			newnodetype := deployment.NodeType{Name: "BS0", Hmin: BSHEIGHT, Hmax: BSHEIGHT, Count: nCells}
-			newnodetype.Mode = deployment.TransmitOnly
+			newnodetype.Mode = BSMode
 			setting.AddNodeType(newnodetype)
 
 			newnodetype = deployment.NodeType{Name: "BS1", Hmin: BSHEIGHT, Hmax: BSHEIGHT, Count: nCells}
-			newnodetype.Mode = deployment.TransmitOnly
+			newnodetype.Mode = BSMode
 			setting.AddNodeType(newnodetype)
 
 			newnodetype = deployment.NodeType{Name: "BS2", Hmin: BSHEIGHT, Hmax: BSHEIGHT, Count: nCells}
-			newnodetype.Mode = deployment.TransmitOnly
+			newnodetype.Mode = BSMode
 			setting.AddNodeType(newnodetype)
 
 			// newnodetype = deployment.NodeType{Name: "OBS0", Hmin: 30.0, Hmax: 30.0, Count: nCells}
@@ -356,16 +363,17 @@ func DeployLayer1(system *deployment.DropSystem) {
 			// setting.AddNodeType(newnodetype)
 
 			/// CASE B1 & B2
+			UEMode := deployment.ReceiveOnly
 			newnodetype = deployment.NodeType{Name: "UE", Hmin: 1.1, Hmax: 1.1, Count: GPusers * trueCells}
-			newnodetype.Mode = deployment.ReceiveOnly
+			newnodetype.Mode = UEMode
 			setting.AddNodeType(newnodetype)
 
 			newnodetype = deployment.NodeType{Name: "VUE", Hmin: 1.1, Hmax: 1.1, Count: NUEsPerVillage * NVillages * trueCells}
-			newnodetype.Mode = deployment.ReceiveOnly
+			newnodetype.Mode = UEMode
 			setting.AddNodeType(newnodetype)
 
 			newnodetype = deployment.NodeType{Name: "MUE", Hmin: 1.1, Hmax: 1.1, Count: NMobileUEs * trueCells}
-			newnodetype.Mode = deployment.ReceiveOnly
+			newnodetype.Mode = UEMode
 			setting.AddNodeType(newnodetype)
 
 			// vlib.SaveStructure(setting, "depSettings.json", true)
