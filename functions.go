@@ -3,6 +3,7 @@ package cellular
 import (
 	"log"
 	"math"
+	"time"
 
 	"github.com/wiless/cellular/antenna"
 
@@ -71,6 +72,7 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss
 				ant.FreqHz = f * 1.0e9
 				ant.Centre = txnode.Location
 				ant.HTiltAngle = txnode.Direction
+
 				ant.CreateElements(txnode.Location)
 				// log.Println(txnode.Orientation)
 				// antenna.HTiltAngle, antenna.VTiltAngle = txnode.Orientation[0], txnode.Orientation[1]
@@ -79,6 +81,8 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss
 				// lossDb := model.LossInDb(distance)
 				//txnode.Location.Z = txnode.Height
 				// model.LossInDb3D(txnode.Location, rxnode.Location)
+				log.Println("what is this ===#=====#=========*=== ", ant)
+				time.Sleep(1 * time.Second)
 				lossDb, _ := model.LossInDb3D(txnode.Location, rxnode.Location, f)
 				aasgain, _, _ := ant.AASGain(rxnode.Location)
 
@@ -213,6 +217,7 @@ func (w WSystem) EvaluteLinkMetric(singlecell *deployment.DropSystem, model path
 				// 	fmt.Printf("\nAntenna Elements %d @ %v \n Metrics  w.r.t Antenna Centre : %f %f %f", i, v, dist, thetaH, thetaV)
 				// }
 				// // }
+
 				lossDb, plerr := model.LossInDb3D(txnode.Location, rxnode.Location, systemFrequencyGHz)
 				if !plerr {
 					log.Fatal("Cannot work")
@@ -228,7 +233,7 @@ func (w WSystem) EvaluteLinkMetric(singlecell *deployment.DropSystem, model path
 				// fmt.Printf("\n Storing RSRP for %d is %v", txnodeID, rxRSRP)
 
 				if math.IsInf(rxRSRP, 0) {
-					log.Panicln("=============%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+					log.Panicln("============= %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
 				}
 
 				link.TxNodesRSRP.AppendAtEnd(rxRSRP)

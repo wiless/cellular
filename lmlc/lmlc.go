@@ -1,12 +1,15 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math"
 	"math/cmplx"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -42,11 +45,11 @@ var secangles = vlib.VectorF{0.0, 120.0, -120.0}
 var nCells = 19 + 42
 var trueCells = 1
 
-var CellRadius float64 = 3450.0
+var CellRadius float64 = 1000.0
 var TxPowerDbm float64 = 46.0
 var CarriersGHz = vlib.VectorF{0.7}
 var RXTYPES = []string{"MUE"}
-var VTILT = 0.0
+var VTILT float64 = 15.0
 
 var NVillages = 3
 var VillageRadius = 400.0
@@ -57,14 +60,85 @@ var GPusers = 0        //525
 var NUEsPerVillage = 0 //125
 var NMobileUEs = 1000  // 100
 
-func init() {
+var fnameSINRTable string
+var fnameMetricName string
 
+var outdir string
+var indir string
+var defaultdir string
+var currentdir string
+
+func SwitchBack() {
+	pwd, _ := os.Getwd()
+	log.Printf("Switching to DEFAULT %s to %s ", pwd, currentdir)
+	os.Chdir(currentdir)
+}
+
+func SwitchInput() {
+	pwd, _ := os.Getwd()
+	currentdir = pwd
+	log.Printf("Switching to INPUT %s to %s ", pwd, indir)
+	os.Chdir(indir)
+
+}
+func SwitchOutput() {
+	pwd, _ := os.Getwd()
+	currentdir = pwd
+	log.Printf("Switching to OUTPUT %s to %s ", pwd, outdir)
+	os.Chdir(outdir)
+}
+
+func ReadConfig() {
+
+	defaultdir, _ = os.Getwd()
+	currentdir = defaultdir
+	if indir == "." {
+		indir = defaultdir
+	} else {
+		finfo, err := os.Stat(indir)
+		if err != nil {
+			log.Println("Error Input Dir ", indir, err)
+			os.Exit(-1)
+		} else {
+			if !finfo.IsDir() {
+				log.Println("Error Input Dir is not a Directory ", indir)
+				os.Exit(-1)
+			}
+		}
+
+	}
+
+	if outdir == "." {
+		outdir = defaultdir
+	} else {
+		finfo, err := os.Stat(outdir)
+		if err != nil {
+			log.Print("Creating OUTPUT directory : ", outdir)
+			err = os.Mkdir(outdir, os.ModeDir|os.ModePerm)
+			if err != nil {
+				log.Print("Error Creating Directory ", outdir, err)
+				os.Exit(-1)
+			}
+
+		} else {
+			if !finfo.IsDir() {
+				log.Panicln("Error Output Dir is not a Directory ", outdir)
+			}
+		}
+
+	}
+	outdir, _ = filepath.Abs(outdir)
+	indir, _ = filepath.Abs(indir)
+	log.Printf("WORK directory : %s", defaultdir)
+	log.Printf("INPUT directory :  %s", indir)
+	log.Printf("OUTPUT directory :  %s", outdir)
+
+	// Read other parameters of the Application
+
+}
+func loadDefaults() {
+	/// START OTHER THINGS
 	defaultAAS.SetDefault()
-
-	//	vlib.LoadStructure("omni.json", &defaultAAS)
-	vlib.LoadStructure("sector.json", &defaultAAS)
-
-	// vlib.LoadStructure("omni.json", defaultAAS)
 
 	// defaultAAS.N = 1
 	defaultAAS.FreqHz = CarriersGHz[0]
@@ -81,11 +155,45 @@ func init() {
 	// defaultAAS.CurveWidthInDegree = 30.0
 	// defaultAAS.CurveRadius = 1.00
 
-	vlib.SaveStructure(defaultAAS, "defaultAAS.json", true)
+}
+
+func init() {
+	flag.StringVar(&outdir, "outdir", ".", "Directory where all the output files are generated..")
+	flag.StringVar(&indir, "indir", ".", "Directory where all the input files are read..")
+	help := flag.Bool("help", false, "prints this help")
+	verbose := flag.Bool("v", true, "Print logs verbose mode")
+	flag.Parse()
+
+	if *help {
+		flag.PrintDefaults()
+		os.Exit(0)
+		return
+	}
+
+	ReadConfig()
+	log.Println("Current indir & outdir ", indir, outdir)
+	ReadAppConfig()
+	//	vlib.LoadStructure("omni.json", &defaultAAS)
+	SwitchInput()
+	vlib.LoadStructure("sector.json", &defaultAAS)
+	SwitchBack()
+	// vlib.LoadStructure("omni.json", defaultAAS)
+
+	// vlib.SaveStructure(defaultAAS, "defaultAAS.json", true)
+
+	fnameSINRTable = "table700MHz.dat"
+
+	// fnameMetricName = "metric700MHz" + cast.ToString(TxPowerDbm) + cast.ToString(CellRadius) + ".json"
+	fnameMetricName = "metric700MHz.json"
+	if !*verbose {
+		log.SetOutput(ioutil.Discard)
+	}
 }
 
 func main() {
+	SwitchOutput()
 	matlab = vlib.NewMatlab("deployment")
+	SwitchBack()
 	matlab.Silent = true
 	matlab.Json = false
 
@@ -124,30 +232,38 @@ func main() {
 		singlecell.SetAllNodeProperty(bs, "Direction", secangles[indx])
 		newids := singlecell.GetNodeIDs(bs)
 		bsids.AppendAtEnd(newids...)
-		fmt.Printf("\n %s : %v", bs, newids)
+		log.Printf("\n %s : %v", bs, newids)
 
 	}
 
-	// for indx, bs := range layer2BS {
-	// 	singlecell.SetAllNodeProperty(bs, "FreqGHz", CarriersGHz)
-	// 	singlecell.SetAllNodeProperty(bs, "TxPowerDBm", 22.0)
-	// 	singlecell.SetAllNodeProperty(bs, "Direction", secangles[indx])
-	// 	newids := singlecell.GetNodeIDs(bs)
-	// 	bsids.AppendAtEnd(newids...)
-	// 	fmt.Printf("\n %s : %v", bs, newids)
-
-	// }
-
 	CreateAntennas(singlecell, bsids)
-	vlib.SaveStructure(systemAntennas, "antennaArray.json", true)
-	vlib.SaveStructure(singlecell.GetSetting(), "dep.json", true)
-	vlib.SaveStructure(singlecell.Nodes, "nodelist.json", true)
+	SwitchOutput()
+	//	vlib.SaveStructure(systemAntennas, "antennaArray.json", true)
+	// vlib.SaveStructure(singlecell.GetSetting(), "dep.json", true)
+	// vlib.SaveStructure(singlecell.Nodes, "nodelist.json", true)
 
 	rxtypes := RXTYPES
 
-	/// System 1 @ 400MHz
-	// Dump UE locations
-	{
+	/// DUMPING OUTPUT Databases
+
+	wsystem := cell.NewWSystem()
+	wsystem.BandwidthMHz = 20
+	wsystem.FrequencyGHz = CarriersGHz[0]
+
+	rxids := singlecell.GetNodeIDs(rxtypes...)
+
+	log.Println("Evaluating Link Gains for RXid range : ", rxids[0], rxids[len(rxids)-1], len(rxids))
+	RxMetrics400 := make(map[int]cell.LinkMetric)
+	baseCells := vlib.VectorI{0, 1, 2}
+	baseCells = baseCells.Scale(nCells)
+
+	for _, rxid := range rxids {
+		metric := wsystem.EvaluteLinkMetric(&singlecell, &plmodel, rxid, myfunc)
+		RxMetrics400[rxid] = metric
+	}
+
+	SwitchOutput()
+	{ // Dump UE locations
 
 		fid, _ := os.Create("uelocations.dat")
 		ueids := singlecell.GetNodeIDs(rxtypes...)
@@ -162,8 +278,7 @@ func main() {
 
 	}
 
-	// Dump bs nodelocations
-	{
+	{ // Dump bs nodelocations
 		fid, _ := os.Create("bslocations.dat")
 
 		fmt.Fprintf(fid, "%% ID\tX\tY\tZ\tPower\tdirection")
@@ -175,40 +290,8 @@ func main() {
 		fid.Close()
 
 	}
-
-	wsystem := cell.NewWSystem()
-	wsystem.BandwidthMHz = 20
-	wsystem.FrequencyGHz = CarriersGHz[0]
-
-	rxids := singlecell.GetNodeIDs(rxtypes...)
-	// bstypes := []string{"BS0", "BS1", "BS2"}
-	// rxids := singlecell.GetNodeIDs(bstypes...)
-
-	log.Println("RXid range : ", rxids[0], rxids[len(rxids)-1], len(rxids))
-	RxMetrics400 := make(map[int]cell.LinkMetric)
-
-	baseCells := vlib.VectorI{0, 1, 2}
-	baseCells = baseCells.Scale(nCells)
-
-	// wsystem.ActiveCells.AppendAtEnd(baseCells.Add(4)...)
-	//wsystem.ActiveCells.AppendAtEnd(baseCells.Add(1)...)
-	//wsystem.ActiveCells.AppendAtEnd(baseCells.Add(4)...)
-
-	// cell := 2
-	// startid := 0 + nUEPerCell*(cell)
-	// endid := nUEPerCell * (cell + 1)
-	// cell0UE := rxids[startid:endid]
-	// log.Printf("\n ************** UEs of Cell %d := %v", cell, cell0UE)
-
-	for _, rxid := range rxids {
-		metric := wsystem.EvaluteLinkMetric(&singlecell, &plmodel, rxid, myfunc)
-		RxMetrics400[rxid] = metric
-	}
-
-	// Dump antenna nodelocations
-	{
+	{ // Dump antenna nodelocations
 		fid, _ := os.Create("antennalocations.dat")
-
 		fmt.Fprintf(fid, "%% ID\tX\tY\tZ\tHDirection\tHWidth\tVTilt")
 		for _, id := range bsids {
 			ant := myfunc(id)
@@ -221,90 +304,26 @@ func main() {
 
 		}
 		fid.Close()
-
 	}
 
-	vlib.DumpMap2CSV("table700MHz.dat", RxMetrics400)
-	vlib.SaveStructure(RxMetrics400, "metric700MHz.json", true)
-
-	/// Code Dump for Throughput Calculation
-
-	// log.Printf("\n ************** UEs of Cell %d := %v", cell, cell0UE)
-
-	// BaseID             int `json:"baseID"`
-	// SecID              int `json:"secID"`
-	// UserID             int `json:"userID"`
-	// RSSI               float64
-	// IfStation          vlib.VectorI `json:"ifStation"`
-	// IfRSSI             vlib.VectorF `json:"ifRSSI"`
-	// ThermalNoise       float64      `json:"thermalNoise"`
-	// SINR               float64
-	// RestOfInterference float64 `json:"restOfInterference"`
-
-	MatlabResult := make([]MatInfo, len(rxids))
-	for indx, rxid := range rxids {
-		metric := RxMetrics400[rxid]
-		var minfo MatInfo
-		minfo.UserID = metric.RxNodeID
-		minfo.SecID = int(math.Floor(float64(metric.BestRSRPNode) / float64(nCells)))
-		minfo.BaseID = metric.BestRSRPNode
-		minfo.RSSI = 0 // normalized
-
+	{ /// Evaluage Dominant Interference Profiles
 		MAXINTER := 8
-		if metric.TxNodeIDs.Size() < MAXINTER {
-			MAXINTER = len(metric.TxNodeIDs) - 1
-		}
-		// log.Println("METRIC TxNodes ", metric.TxNodeIDs)
-		minfo.IfStation = metric.TxNodeIDs[1:MAXINTER] // the first entry is best
-		var ifrssi vlib.VectorF
-		ifrssi = metric.TxNodesRSRP[1:]
-		ifrssi = ifrssi.Sub(metric.TxNodesRSRP[0])
+		var fnameDIP string
 
-		residual := ifrssi[MAXINTER:]
-		residual = vlib.InvDbF(residual)
-		ifrssi = ifrssi[0:MAXINTER]
+		fnameDIP = "DIPprofilesNORM"
+		MatlabResult := EvaluateDIP(RxMetrics400, rxids, MAXINTER, true) // Evaluates the normalized Dominant Interference Profiles
+		vlib.SaveStructure(MatlabResult, fnameDIP+".json", true)
 
-		minfo.IfRSSI = ifrssi // the first entry is best
-		minfo.ThermalNoise = metric.N0 - metric.TxNodesRSRP[0]
-		minfo.SINR = metric.BestSINR
-		minfo.RestOfInterference = vlib.Db(vlib.Sum(residual))
+		fnameDIP = "DIPprofiles"
+		MatlabResult = EvaluateDIP(RxMetrics400, rxids, MAXINTER, false) // Evaluates the normalized Dominant Interference Profiles
+		vlib.SaveStructure(MatlabResult, fnameDIP+".json", true)
 
-		MatlabResult[indx] = minfo
 	}
-	vlib.SaveStructure(MatlabResult, "matlabdump.json", true)
 
-	// /// System 2 @ 1800MHz
-	// RxMetrics1800 := make(map[int]cell.LinkMetric)
-	// wsystem.BandwidthMHz = 10
-	// wsystem.FrequencyGHz = 0.4
-	// singlecell.SetAllNodeProperty("BS", "TxPowerDBm", 22.0)
-	// for _, rxid := range rxids {
-	// 	metric := wsystem.EvaluteLinkMetric(&singlecell, &hatamodel, rxid, myfunc)
-	// 	RxMetrics1800[rxid] = metric
-	// }
-	// vlib.SaveStructure(RxMetrics1800, "metric1800MHz.json", true)
-	// DumpMap2CSV("table1800.dat", RxMetrics1800)
-	// _, ids := deployment.HexWrapGrid(nCells, vlib.Origin3D, CellRadius, 30, trueCells)
-	// matlab.Export("VirtualCellID", ids)
-
+	vlib.DumpMap2CSV(fnameSINRTable, RxMetrics400)
+	vlib.SaveStructure(RxMetrics400, fnameMetricName, true)
+	SwitchBack()
 	matlab.Close()
-
-	// matlab = vlib.NewMatlab("sinrVal.m")
-	// legendstring := ""
-	// var SINR vlib.VectorF
-	// for _, sinr := range SINR {
-
-	// 	str := fmt.Sprintf("sinr%d", int(wsystem.FrequencyGHz*1000))
-	// 	// str = strings.Replace(str, ".", "", -1)
-	// 	matlab.Export(str, sinr)
-	// 	matlab.Command("cdfplot(" + str + ");hold all;")
-	// 	legendstring += str + " "
-
-	// }
-	// matlab.Export("TxPower", singlecell.GetNodeType("BS").TxPowerDBm)
-	// matlab.Export("AntennaGainDb", defaultAAS.GainDb)
-	// matlab.Command(fmt.Sprintf("legend %v", legendstring))
-	// matlab.Close()
 	fmt.Println("\n ============================")
 
 }
@@ -319,9 +338,6 @@ func DeployLayer1(system *deployment.DropSystem) {
 
 		GENERATE := true
 		if GENERATE {
-			// AreaRadius := CellRadius
-			/// Should come from API
-			// setting.SetCoverage(deployment.CircularCoverage(AreaRadius))
 
 			BSHEIGHT := 35.0
 			BSMode := deployment.TransmitOnly
@@ -379,7 +395,9 @@ func DeployLayer1(system *deployment.DropSystem) {
 			// vlib.SaveStructure(setting, "depSettings.json", true)
 
 		} else {
+			SwitchInput()
 			vlib.LoadStructure("depSettings.json", setting)
+			SwitchBack()
 			fmt.Printf("\n %#v", setting.NodeTypes)
 		}
 		system.SetSetting(setting)
@@ -511,9 +529,10 @@ func CreateAntennas(system deployment.DropSystem, bsids vlib.VectorI) {
 	for _, i := range bsids {
 
 		systemAntennas[i] = antenna.NewAAS()
-
 		// copy(systemAntennas[i], defaultAAS)
-		vlib.LoadStructure("sector.json", systemAntennas[i])
+		// SwitchInput()
+		// vlib.LoadStructure("sector.json", systemAntennas[i])
+		// SwitchBack()
 		*systemAntennas[i] = defaultAAS
 
 		// systemAntennas[i].FreqHz = CarriersGHz[0] * 1.e9
@@ -542,10 +561,56 @@ func CreateAntennas(system deployment.DropSystem, bsids vlib.VectorI) {
 			cnt++
 		}
 
+		// SwitchOutput()
 		matlab.Export("gain"+strconv.Itoa(i), hgain)
+		// SwitchBack()
 		// fmt.Printf("\nBS %d, Antenna : %#v", i, systemAntennas[i])
 
 		cmd = fmt.Sprintf("polar(phaseangle,gain%d);hold all", i)
 		matlab.Command(cmd)
 	}
+}
+
+func EvaluateDIP(RxMetrics map[int]cell.LinkMetric, rxids vlib.VectorI, MAXINTER int, DONORM bool) []MatInfo {
+
+	MatlabResult := make([]MatInfo, len(rxids))
+
+	for indx, rxid := range rxids {
+		metric := RxMetrics[rxid]
+		var minfo MatInfo
+		minfo.UserID = metric.RxNodeID
+		minfo.SecID = int(math.Floor(float64(metric.BestRSRPNode) / float64(nCells)))
+		minfo.BaseID = metric.BestRSRPNode
+
+		if metric.TxNodeIDs.Size() < MAXINTER {
+			MAXINTER = len(metric.TxNodeIDs) - 1
+		}
+		// log.Println("METRIC TxNodes ", metric.TxNodeIDs)
+		minfo.IfStation = metric.TxNodeIDs[1:MAXINTER] // the first entry is best
+		var ifrssi vlib.VectorF
+		ifrssi = metric.TxNodesRSRP[1:]
+
+		if DONORM {
+			minfo.RSSI = 0 // normalized
+			ifrssi = ifrssi.Sub(metric.TxNodesRSRP[0])
+		} else {
+			minfo.RSSI = metric.TxNodesRSRP[0]
+
+		}
+
+		residual := ifrssi[MAXINTER:]
+		residual = vlib.InvDbF(residual)
+		ifrssi = ifrssi[0:MAXINTER]
+
+		minfo.IfRSSI = ifrssi // the first entry is best
+		minfo.ThermalNoise = metric.N0
+		if DONORM {
+			minfo.ThermalNoise -= metric.RSSI
+		}
+		minfo.SINR = metric.BestSINR
+		minfo.RestOfInterference = vlib.Db(vlib.Sum(residual))
+
+		MatlabResult[indx] = minfo
+	}
+	return MatlabResult
 }
