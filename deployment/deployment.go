@@ -84,7 +84,7 @@ type NodeType struct {
 	NodeIDs    vlib.VectorI `json:",strings"`
 	Params     DropParameter
 	TxPowerDBm float64
-	Direction  float64 // Direction in degree 0 to 360, If set > 360 or 9999 its OMNI
+	Direction  float64 // Direction in degree 0 to 360, for omni set to constant 'OMNIDIRECTION'
 
 	Mode TxRxMode `json:"TxRxMode"`
 }
