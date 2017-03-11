@@ -323,7 +323,7 @@ func NewNodeType(name string, heights ...float64) *NodeType {
 	result.Direction = OMNIDIRECTION //Default direction of the Nodes of this type have antenna
 	switch len(heights) {
 	case 0:
-		result.Hmax, result.Hmax = 0, 0
+		result.Hmin, result.Hmax = 0, 0
 	case 1:
 		result.Hmin, result.Hmax = heights[0], heights[0]
 	default: /// Any arguments >=2
