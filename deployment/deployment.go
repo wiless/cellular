@@ -22,15 +22,16 @@ type Node struct {
 	ID       int
 	Location vlib.Location3D
 	// Height      float64	/// moved Location member variable
-	Meta        string
-	Indoor      bool
-	Orientation vlib.VectorF
-	AntennaType int
-	Direction   float64
-	TxPowerDBm  float64
-	FreqGHz     vlib.VectorF
-	Mode        TxRxMode `json:"TxRxMode"`
-	alias       int
+	Meta         string
+	Indoor       bool
+	IndoorCenter vlib.Location3D /// Location of the center of Building if its Indoor , assumed at Node at Center if not set
+	Orientation  vlib.VectorF
+	AntennaType  int
+	Direction    float64
+	TxPowerDBm   float64
+	FreqGHz      vlib.VectorF
+	Mode         TxRxMode `json:"TxRxMode"`
+	alias        int
 }
 
 func (n Node) Alias() int {

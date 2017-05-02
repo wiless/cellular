@@ -29,13 +29,12 @@ func (w RMa) Get() ModelSetting {
 func (r *RMa) LossInDb3D(src, dest vlib.Location3D, freqGHz float64) (plDb float64, valid bool) {
 	// FreqMHz := freqGHz * 1.0e3                 // Frequency is in MHz
 	// distance := src.DistanceFrom(dest) / 1.0e3 // Convert to km (most equations have d in km)
-
 	// var result float64
 	// result = -1
-
 	// result = 46.3 + 33.9*math.Log10(FreqMHz) - 13.82*math.Log10(src.Z) - a + (44.9-6.55*math.Log10(src.Z))*math.Log10(distance) + 3
 
 	return 0, true
+
 }
 
 func (r *RMa) LossInDbNodes(txnode, rxnode deployment.Node, freqGHz float64) (plDb float64, valid bool) {

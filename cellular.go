@@ -36,6 +36,7 @@ func (l *LinkMetric) SetParams(fGHz, bwMHz float64) {
 	NoisePSDdBmPerHz := -173.9
 	l.N0 = NoisePSDdBmPerHz + vlib.Db(bwMHz*1e6)
 	l.FreqInGHz = fGHz
+
 }
 
 //CreateLink creates a single tx-rx link with a given SNR with bandwidth=10MHz, Signal power assumed as 0dBm

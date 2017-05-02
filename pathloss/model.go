@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"math"
+	"strings"
 
 	"github.com/wiless/cellular/deployment"
 
@@ -38,10 +39,53 @@ func (p PathLossType) String() string {
 type ModelSetting struct {
 	Type           PathLossType
 	FreqHz         float64
+	freqGHz        float64
 	CutOffDistance float64
 	Param          []float64 /// Factors relatedto
+	pNames         []string
+	Name           string
 	isInitialized  bool
 	AddShadowLoss  bool
+	param          map[string]float64 /// always use capital letters for parameter name
+}
+
+func (m *ModelSetting) SetFGHz(fGHz float64) *ModelSetting {
+	m.FreqHz = fGHz * 1e9
+	m.freqGHz = fGHz
+	return m
+}
+
+// Value returns the vaue of the paramter set for the model
+func (m *ModelSetting) Value(pname string) float64 {
+	if m.param == nil {
+		return 0
+	}
+	pname = strings.ToUpper(pname)
+	value := m.param[pname]
+	return value
+}
+
+func (m *ModelSetting) Parameters() []string {
+	return m.pNames
+}
+
+func (m *ModelSetting) AddParam(name string, value float64) *ModelSetting {
+	if m.param == nil {
+		m.param = make(map[string]float64)
+
+	}
+	name = strings.ToUpper(name)
+	m.param[name] = value
+	m.pNames = append(m.pNames, name)
+	m.Param = append(m.Param, value)
+	return m
+}
+
+func (m *ModelSetting) FGHz() (fGHz float64) {
+	if m.freqGHz == 0 {
+		m.freqGHz = m.FreqHz / 1.0e9
+	}
+	return m.freqGHz
 }
 
 func (m *ModelSetting) SetDefault() {
@@ -50,7 +94,6 @@ func (m *ModelSetting) SetDefault() {
 	m.CutOffDistance = 0
 	m.AddShadowLoss = false
 	m.Init()
-
 }
 
 func (m *ModelSetting) Init() {
@@ -73,6 +116,7 @@ func (m *ModelSetting) Init() {
 
 func NewModelSetting() *ModelSetting {
 	result := new(ModelSetting)
+	result.param = make(map[string]float64)
 	result.SetDefault()
 	return result
 }
