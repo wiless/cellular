@@ -85,7 +85,7 @@ type NodeType struct {
 	NodeIDs    vlib.VectorI `json:",strings"`
 	Params     DropParameter
 	TxPowerDBm float64
-	Direction  float64 // Direction in degree 0 to 360, If set > 360 or 9999 its OMNI
+	Direction  float64 // Direction in degree 0 to 360, for omni set to constant 'OMNIDIRECTION'
 
 	Mode TxRxMode `json:"TxRxMode"`
 }
@@ -324,7 +324,7 @@ func NewNodeType(name string, heights ...float64) *NodeType {
 	result.Direction = OMNIDIRECTION //Default direction of the Nodes of this type have antenna
 	switch len(heights) {
 	case 0:
-		result.Hmax, result.Hmax = 0, 0
+		result.Hmin, result.Hmax = 0, 0
 	case 1:
 		result.Hmin, result.Hmax = heights[0], heights[0]
 	default: /// Any arguments >=2
