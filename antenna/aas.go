@@ -282,20 +282,29 @@ func (params *SettingAAS) AASGain(dest vlib.Location3D) (gain float64, effective
 	phaseDelay := vlib.NewVectorF(AntennaElementLocations.Size())
 	var Rxcomponent complex128
 	Rxcomponent = 0.0
+	var dist, thetaH, thetaV float64
+	var aGain complex128
 
-	// fmt.Printf("\n Weights : %v", w)
 	for i := 0; i < params.N; i++ {
 		// dist, thetaH, thetaV := vlib.RelativeGeo(params.elementLocations[i], dest)
-		dist, thetaH, thetaV := vlib.RelativeGeo(params.Centre, dest)
+		dist, thetaH, thetaV = vlib.RelativeGeo(params.Centre, dest)
 
 		// dist= cmplx.Abs(params.elementLocations[i].Cmplx()-dest.Cmplx())
-		aGain := complex((params.ElementEffectiveGain(thetaH, thetaV)), 0)
-		_, phaseDelay[i] = (math.Modf(2 * math.Pi * dist / params.lamda))
+		aGain = complex((params.ElementEffectiveGain(thetaH, thetaV)), 0)
+
+		_, phaseDelay[i] = math.Modf(2 * math.Pi * dist / params.lamda)
+
 		Rxcomponent += GetEJtheta(vlib.ToDegree(phaseDelay[i])) * w[i] * aGain
 	}
-	gain = math.Pow(cmplx.Abs(Rxcomponent), 2)
-	_, effectiveThetaH, effectiveThetaV = vlib.RelativeGeo(params.Centre, dest)
-	return gain, effectiveThetaH, effectiveThetaV
+
+	// gain = math.Pow(cmplx.Abs(Rxcomponent), 1)
+	gain = cmplx.Abs(Rxcomponent) // validate @ssk - May 28th 2017
+	dist, thetaH, thetaV = vlib.RelativeGeo(params.Centre, dest)
+
+	if gain > vlib.InvDb(params.GainDb) {
+		fmt.Printf("\n AAS  : Rx complex = %v Rx |aGain  %v | %v  | %v limit at dist=%v", Rxcomponent, gain, vlib.InvDb(params.GainDb), dist)
+	}
+	return gain, thetaH, thetaV
 
 }
 
@@ -446,7 +455,7 @@ func (params *SettingAAS) FindWeights(theta float64) vlib.VectorC {
 
 }
 
-// Angle expected between -180 to 180
+// Angle expected between -180 to 180 / in Linear Scale
 func (s SettingAAS) ElementDirectionHGain(degree float64) float64 {
 	if s.Omni {
 		return 1.0
@@ -471,6 +480,7 @@ func (s SettingAAS) ElementDirectionHGain(degree float64) float64 {
 	return val
 }
 
+// Angle expected between -180 to 180 / in Linear Scale
 func (s SettingAAS) ElementDirectionVGain(degree float64) float64 {
 	if s.Omni {
 		return 1.0
@@ -500,7 +510,9 @@ func (s SettingAAS) ElementEffectiveGain(thetaH, thetaV float64) float64 {
 	// sumgain = 1.0 / sumgain
 	// sumgain = 1 / (sumgain ^ 2)
 	// ZZ(x, y) = 1 / min(sumgain, 1000)
-	return math.Max(sumgain, vlib.InvDb(-s.SLAV)) * vlib.InvDb(s.GainDb)
+
+	result := math.Max(sumgain, vlib.InvDb(-s.SLAV)) * vlib.InvDb(s.GainDb)
+	return result
 }
 
 func (s SettingAAS) ElementDirectionGain(theta float64) float64 {

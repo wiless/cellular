@@ -24,6 +24,7 @@ type Node struct {
 	// Height      float64	/// moved Location member variable
 	Meta         string
 	Indoor       bool
+	InCar        bool
 	IndoorCenter vlib.Location3D /// Location of the center of Building if its Indoor , assumed at Node at Center if not set
 	Orientation  vlib.VectorF
 	AntennaType  int
@@ -250,6 +251,7 @@ func (d *DropSystem) NewNode(ntype string) *Node {
 	node := new(Node)
 	node.Type = notype.Name
 	node.Indoor = false
+	node.InCar = false
 	node.FreqGHz = []float64{FcInGHz}
 	node.AntennaType = 0
 	node.Orientation = []float64{0, 0} /// Horizontal, Vertical orientation in degree

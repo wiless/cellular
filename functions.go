@@ -1,6 +1,7 @@
 package cellular
 
 import (
+	"fmt"
 	"log"
 	"math"
 	"time"
@@ -93,7 +94,7 @@ func (w WSystem) EvaluteMetric(singlecell *deployment.DropSystem, model pathloss
 				if w.OtherLossFn != nil {
 					otherLossDb = w.OtherLossFn(txnode, rxnode)
 				}
-
+				// log.Print(vlib.Db(aasgain), txnode.TxPowerDBm, lossDb, otherLossDb)
 				rxRSRP := vlib.Db(aasgain) + txnode.TxPowerDBm - lossDb - otherLossDb
 				link.TxNodesRSRP.AppendAtEnd(rxRSRP)
 
@@ -235,6 +236,10 @@ func (w WSystem) EvaluteLinkMetric(singlecell *deployment.DropSystem, model path
 
 				// fmt.Printf("\nOther values are aas=%v,txpower=%v,Ploss=%v , PLERROR =%v", vlib.Db(aasgain), txnode.TxPowerDBm, lossDb, plerr)
 				rxRSRP := vlib.Db(aasgain) + txnode.TxPowerDBm - lossDb
+
+				if rxRSRP > -59 {
+					fmt.Printf("\n asdfasdfs EVAL1 %d RSSI =%v, AAS =%f ,PL = %f, otherLoss=%f ", rxid, rxRSRP, vlib.Db(aasgain), lossDb)
+				}
 				// fmt.Printf("\n Distance is %f", dist)
 				// fmt.Printf("\n Angle is H,V %f,%f", thetaH, thetaV)
 
@@ -295,7 +300,7 @@ func (w WSystem) EvaluteLinkMetric(singlecell *deployment.DropSystem, model path
 }
 
 // EvaluteLinkMetricV2 evalutes the link metric with New PL model interface
-func (w WSystem) EvaluteLinkMetricV2(singlecell *deployment.DropSystem, model CM.PLModel, rxid int, afn AntennaOfTxNode) LinkMetric {
+func (w *WSystem) EvaluteLinkMetricV2(singlecell *deployment.DropSystem, model CM.PLModel, rxid int, afn AntennaOfTxNode) LinkMetric {
 	BandwidthMHz := w.BandwidthMHz
 	NoisePSDdBm := w.NoisePSDdBm
 	systemFrequencyGHz := w.FrequencyGHz
@@ -366,8 +371,11 @@ func (w WSystem) EvaluteLinkMetricV2(singlecell *deployment.DropSystem, model CM
 				// }
 				// // }
 				var lossDb float64
+				var dist float64
 				if model.IsSupported(systemFrequencyGHz) {
+
 					pldb, _, plerr := model.PLbetween(txnode.Location, rxnode.Location)
+					dist = txnode.Location.Distance2DFrom(rxnode.Location)
 					if plerr != nil {
 						log.Printf("PathLoss Error : %v, setting to FIXED %v", plerr, DEFAULTERR_PL)
 						pldb = DEFAULTERR_PL
@@ -380,7 +388,18 @@ func (w WSystem) EvaluteLinkMetricV2(singlecell *deployment.DropSystem, model CM
 				aasgain, _, _ := ant.AASGain(rxnode.Location)
 
 				// fmt.Printf("\nOther values are aas=%v,txpower=%v,Ploss=%v , PLERROR =%v", vlib.Db(aasgain), txnode.TxPowerDBm, lossDb, plerr)
-				rxRSRP := vlib.Db(aasgain) + txnode.TxPowerDBm - lossDb
+
+				var otherLossDb float64 = 0
+				if w.OtherLossFn != nil {
+					otherLossDb = w.OtherLossFn(txnode, rxnode)
+				}
+				rxRSRP := vlib.Db(aasgain) + txnode.TxPowerDBm - lossDb - otherLossDb
+				AASGain := vlib.Db(aasgain)
+				if AASGain > ant.GainDb {
+					fmt.Printf("\n EVAL2 %d RSSI =%v, AAS =%f [%f] ,PL = %f , , otherLoss=%f , dist =%v", rxid, rxRSRP, AASGain, aasgain, lossDb, otherLossDb, dist)
+				}
+				// log.Print(rxRSRP, "=", vlib.Db(aasgain), txnode.TxPowerDBm, lossDb, otherLossDb)
+				// rxRSRP := vlib.Db(aasgain) + txnode.TxPowerDBm - lossDb
 				// fmt.Printf("\n Distance is %f", dist)
 				// fmt.Printf("\n Angle is H,V %f,%f", thetaH, thetaV)
 
