@@ -299,8 +299,8 @@ func (w WSystem) EvaluteLinkMetric(singlecell *deployment.DropSystem, model path
 	return link
 }
 
-// EvaluteLinkMetricV2 evalutes the link metric with New PL model interface
-func (w *WSystem) EvaluteLinkMetricV2(singlecell *deployment.DropSystem, model CM.PLModel, rxid int, afn AntennaOfTxNode) LinkMetric {
+// EvaluteLinkMetricV2 evaluates the link metric with New PL model interface
+func (w *WSystem) EvaluateLinkMetricV2(singlecell *deployment.DropSystem, model CM.PLModel, rxid int, afn AntennaOfTxNode) LinkMetric {
 	BandwidthMHz := w.BandwidthMHz
 	NoisePSDdBm := w.NoisePSDdBm
 	systemFrequencyGHz := w.FrequencyGHz
@@ -377,7 +377,11 @@ func (w *WSystem) EvaluteLinkMetricV2(singlecell *deployment.DropSystem, model C
 					pldb, _, plerr := model.PLbetween(txnode.Location, rxnode.Location)
 					dist = txnode.Location.Distance2DFrom(rxnode.Location)
 					if plerr != nil {
-						log.Printf("PathLoss Error : %v, setting to FIXED %v", plerr, DEFAULTERR_PL)
+						if dist > 30000 {
+							log.Print("===========", txnode.Type)
+							// log.Printf("PathLoss Error : %v, setting to FIXED %v", plerr, DEFAULTERR_PL)
+						}
+						log.Printf("PL Error %v to %v NODE ID = %v & %v ", txnode.Location, rxnode.Location, pldb, txnode.ID, rxnode.ID)
 						pldb = DEFAULTERR_PL
 					}
 					lossDb = pldb
