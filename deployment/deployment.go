@@ -9,7 +9,6 @@ import (
 
 	"log"
 	"math"
-	"math/cmplx"
 	"math/rand"
 
 	ms "github.com/mitchellh/mapstructure"
@@ -622,26 +621,66 @@ func RandPoint(centre complex128, radius float64) complex128 {
 	return result
 }
 
-// % In the code, I will create a hexagon centered at (0,0) with radius R.
-// % The snipplets can be used in mobile capacity predicts and general
-// % systems level simulation of cellular networks.
-func HexRandU(centre complex128, hexRadius float64, Npoints int, rdegree float64) vlib.VectorC {
-	result := vlib.NewVectorC(Npoints)
-	cnt := 0
-	for j := 0; j < Npoints; {
-		sample := vlib.RandUC(1)*complex(2*hexRadius, 0) - complex(hexRadius, hexRadius)
-		r, theta := cmplx.Polar(sample)
-		theta += math.Pi
-		theta1 := (math.Mod(theta*180/math.Pi+30, 60) - 30) * math.Pi / 180
-		if r*math.Cos(theta1) <= hexRadius*math.Cos(math.Pi/6) {
-			result[j] = sample*vlib.GetEJtheta(30+rdegree) + centre
-			j++
-		}
+// HexRandPoints generates N points uniformly distributed inside a hexagon of radius hexRadius
+//centre complex128, hexRadius float64, Npoints int, rdegree float64
+// based on DOI: 10.1109/CAMAD.2009.5161465
+func HexRandPoints(N int, hexRadius float64) vlib.VectorC {
+	// % Implementation
+	U := vlib.RandUFVec(N)
 
-		cnt++
+	//U = rand(1,N);           // Uniformly Distributed Random Number from 0 to 1
+
+	X := vlib.NewVectorF(N)
+	Y := vlib.NewVectorF(N)
+	var x float64
+	for i, u := range U {
+		switch {
+		case (u >= 0 && u <= 1.0/6): // Random Number, U in (0,1/6]
+			x = hexRadius * (math.Sqrt(3*u/2) - 1)
+		case (u > 1.0/6 && u <= 5.0/6): //Random Number, U in [1/6,5/6]
+			x = (3.0 * hexRadius / 4) * (2*u - 1)
+		case (u > 5.0/6 && u <= 1): // Random Number, U in [5/6,1)
+			x = hexRadius * (1 - math.Sqrt((3*(1-u))/(2)))
+		}
+		X[i] = x
+	}
+
+	for i, x := range X {
+		var a, b float64
+		switch {
+		case (x > -hexRadius && x <= -hexRadius/2): // Random Number X in the range (-L,-L/2]
+			a = -math.Sqrt(3) * (x + hexRadius)
+			b = math.Sqrt(3) * (x + hexRadius)
+		case (x > -hexRadius/2 && x <= hexRadius/2): // Random Number X in the range [-L/2,L/2]
+			a = -math.Sqrt(3) * hexRadius / 2
+			b = math.Sqrt(3) * hexRadius / 2
+
+		case (x > hexRadius/2 && x <= hexRadius): //  Random Number X in the range [L/2,L]
+			a = -math.Sqrt(3) * (hexRadius - x)
+			b = math.Sqrt(3) * (hexRadius - x)
+
+		}
+		Y[i] = a + (b-a)*rand.Float64()
 
 	}
-	// log.Printf("HexRandU(@%f) : Iterated %d, for %d samples", centre, cnt, Npoints)
+	result := vlib.ToVectorC2(Y, X)
+
+	return result
+
+}
+
+// % This will create a hexagon centered at (0,0) with radius R.
+// % The snipplets can be used in mobile capacity predicts and general
+// % systems level simulation of cellular networks.
+// rdegree=30, is vertex on top.. rdegree=0, vertex on left & right
+func HexRandU(centre complex128, hexRadius float64, Npoints int, rdegree float64) vlib.VectorC {
+
+	result := HexRandPoints(Npoints, hexRadius)
+	result = result.AddC(centre)
+	if rdegree == 0 {
+		// rotate hex
+		result = vlib.ToVectorC2(result.Imag(), result.Real())
+	}
 	return result
 }
 
