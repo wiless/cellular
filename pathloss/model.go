@@ -45,7 +45,7 @@ type ModelSetting struct {
 	pNames         []string
 	Name           string
 	isInitialized  bool
-	AddShadowLoss  bool
+	ShadowLoss     bool
 	param          map[string]float64 /// always use capital letters for parameter name
 }
 
@@ -92,7 +92,7 @@ func (m *ModelSetting) SetDefault() {
 	m.Type = Exponential
 	m.FreqHz = 2.0e9
 	m.CutOffDistance = 0
-	m.AddShadowLoss = false
+	m.ShadowLoss = false
 	m.Init()
 }
 
