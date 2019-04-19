@@ -302,7 +302,7 @@ func (params *SettingAAS) AASGain(dest vlib.Location3D) (gain float64, effective
 	dist, thetaH, thetaV = vlib.RelativeGeo(params.Centre, dest)
 
 	if gain > vlib.InvDb(params.GainDb) {
-		fmt.Printf("\n AAS  : Rx complex = %v Rx |aGain  %v | %v  | %v limit at dist=%v", Rxcomponent, gain, vlib.InvDb(params.GainDb), dist)
+		log.Printf("\n AAS  : Rx complex = %v Rx |aGain  %v | %v  | %v limit at dist=%v", Rxcomponent, gain, vlib.InvDb(params.GainDb), dist)
 	}
 	return gain, thetaH, thetaV
 
@@ -460,18 +460,19 @@ func (s SettingAAS) ElementDirectionHGain(degree float64) float64 {
 	if s.Omni {
 		return 1.0
 	}
-
+	degree = Wrap180To180(degree)
 	// fmt.Println("Origina ", degree)
-	if degree > 180 {
-		rem := math.Mod(degree, 180.0)
-		degree = -180 + rem
+	// if degree > 180 {
+	// 	rem := math.Mod(degree, 180.0)
+	// 	degree = -180 + rem
 
-	} else if degree < -180 {
-		rem := math.Mod(degree, 180.0)
-		//	fmt.Println("Remainder for ", degree, rem)
-		degree = 180 + rem
-	}
+	// } else if degree < -180 {
+	// 	rem := math.Mod(degree, 180.0)
+	// 	//	fmt.Println("Remainder for ", degree, rem)
+	// 	degree = 180 + rem
+	// }
 	theta := -(degree)
+
 	theta3Db := (s.HBeamWidth)
 	SLAV := s.SLAV
 	tilt := -(s.HTiltAngle)
@@ -480,12 +481,13 @@ func (s SettingAAS) ElementDirectionHGain(degree float64) float64 {
 	return val
 }
 
-// Angle expected between -180 to 180 / in Linear Scale
+// Angle expected between 0 to 180 / in Linear Scale
 func (s SettingAAS) ElementDirectionVGain(degree float64) float64 {
 	if s.Omni {
 		return 1.0
 	}
 
+	//degree = Wrap0To180(degree)
 	if degree > 180 {
 		rem := math.Mod(degree, 180.0)
 		degree = -180 + rem
@@ -499,6 +501,7 @@ func (s SettingAAS) ElementDirectionVGain(degree float64) float64 {
 	SLAV := s.SLAV
 	tilt := -s.VTiltAngle
 	val := math.Pow(10, -math.Min(12.0*math.Pow((theta-tilt)/theta3Db, 2), SLAV)/10.0)
+	val = 1
 	return val
 
 }

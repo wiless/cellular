@@ -203,6 +203,7 @@ func main() {
 	rand.Seed(seedvalue)
 
 	var plmodel pathloss.OkumuraHata
+	
 	// var plmodel walfisch.WalfischIke
 	// var plmodel pathloss.SimplePLModel
 	// var plmodel pathloss.RMa
