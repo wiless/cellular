@@ -28,10 +28,13 @@ type Node struct {
 	Orientation  vlib.VectorF
 	AntennaType  int
 	Direction    float64
+	VTilt        float64
+	GeoCellID    int
 	TxPowerDBm   float64
 	FreqGHz      vlib.VectorF
 	Mode         TxRxMode `json:"TxRxMode"`
 	alias        int
+	Active       bool
 }
 
 func (n Node) Alias() int {
@@ -256,6 +259,7 @@ func (d *DropSystem) NewNode(ntype string) *Node {
 	node.Orientation = []float64{0, 0} /// Horizontal, Vertical orientation in degree
 	node.Mode = notype.Mode
 	node.TxPowerDBm = 1
+	node.Active = true
 	if notype.Hmin == notype.Hmax {
 		node.Location.SetXY(0, 0)
 		node.Location.SetHeight(notype.Hmin)
@@ -621,6 +625,8 @@ func RandPoint(centre complex128, radius float64) complex128 {
 	return result
 }
 
+var MinDistance float64
+
 // HexRandPoints generates N points uniformly distributed inside a hexagon of radius hexRadius
 //centre complex128, hexRadius float64, Npoints int, rdegree float64
 // based on DOI: 10.1109/CAMAD.2009.5161465
@@ -669,6 +675,27 @@ func HexRandPoints(N int, hexRadius float64) vlib.VectorC {
 
 }
 
+func ForceMinDistance(in vlib.VectorC, d, hexradius float64) vlib.VectorC {
+	if d == 0 {
+		return in
+	}
+	log.Println("I am being called")
+	dist := in.Abs()
+	indx := dist.FindLess(d)
+	if indx.Size() > 0 {
+		log.Printf("Found .. %d items of %d < MinDistance %f ", indx.Size(), in.Size(), d)
+		newpos := HexRandPoints(indx.Size(), hexradius)
+
+		for i, pos := range newpos {
+			in[indx[i]] = pos
+		}
+
+		result := ForceMinDistance(in, d, hexradius)
+		return result
+	}
+	return in
+}
+
 // % This will create a hexagon centered at (0,0) with radius R.
 // % The snipplets can be used in mobile capacity predicts and general
 // % systems level simulation of cellular networks.
@@ -676,6 +703,9 @@ func HexRandPoints(N int, hexRadius float64) vlib.VectorC {
 func HexRandU(centre complex128, hexRadius float64, Npoints int, rdegree float64) vlib.VectorC {
 
 	result := HexRandPoints(Npoints, hexRadius)
+	/// Ensure all points are atleast MinDistance away from 0,0/center..
+
+	result = ForceMinDistance(result, MinDistance, hexRadius)
 	result = result.AddC(centre)
 	if rdegree == 0 {
 		// rotate hex

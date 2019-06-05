@@ -68,16 +68,17 @@ func BSPatternDb(theta, phi float64) (az, el, Ag float64) {
 	theta = Wrap180To180(theta)
 	MaxGaindBi := 8.0 //
 	theta3dB := 65.0  // degree
-	SLAmax := 30.0
-	Am := 30.0
+	SLAmax := 60.0
+	Am := SLAmax
 	Ah := -math.Min(12.0*math.Pow(theta/theta3dB, 2.0), Am)
 
 	MechTiltGCS := 90.0 // Pointing to Horizon..axis..
 	Av := -math.Min(12.0*math.Pow((phi-MechTiltGCS)/theta3dB, 2.0), SLAmax)
-	result := -math.Min(-(Av+Ah), Am) + MaxGaindBi
+	result := -math.Min(-(Av + Ah), Am)
+	result = Ah
 	az = theta
 	el = phi
-	Ag = result
+	Ag = result + MaxGaindBi
 	return az, el, Ag
 }
 
