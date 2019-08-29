@@ -345,9 +345,9 @@ func (w *WSystem) EvaluateLinkMetricV2(singlecell *deployment.DropSystem, model 
 		fid, _ := os.Create("antennaBS.dat")
 		fmt.Fprintf(fid, "%%ID\t\t\tD3d\t\t\tTx\t\t\tTy\t\t\tTz\t\t\tRx\t\t\tRy\t\t\tRz")
 		fid1, _ := os.Create("antennaAngles.dat")
-		fmt.Fprintf(fid1, "%%ID\t\tAasgainDB\t\tAasgain\t\tDirection\t\tVTilt\t\taz\t\t\tel\t\tAz\t\tEl")
+		fmt.Fprintf(fid1, "%%ID\t\tAasgainDB\t\tDirection\t\tVTilt\t\taz\t\t\tel\t\tAz\t\tEl")
 		fid2, _ := os.Create("CombineAPattern.dat")
-		fmt.Fprintf(fid2, "%%ID\t\tAasgainDB\t\tNewgain\t\tOLdgain\t\tAz\t\tEl")
+		fmt.Fprintf(fid2, "%%ID\t\tAasgainDB\t\tresult\t\tAg\t\tAz\t\tEl")
 
 		for _, val := range alltxNodeIds {
 			txnodeID := val
@@ -460,6 +460,7 @@ func (w *WSystem) EvaluateLinkMetricV2(singlecell *deployment.DropSystem, model 
 		/// Do the statistics here
 		if nlinks > 0 {
 			link.N0 = N0
+
 			link.BandwidthMHz = BandwidthMHz
 			rsrpLinr := vlib.InvDbF(link.TxNodesRSRP)
 			totalrssi := vlib.Sum(rsrpLinr) + vlib.InvDb(link.N0)
