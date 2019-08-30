@@ -705,6 +705,8 @@ func HexRandU(centre complex128, hexRadius float64, Npoints int, rdegree float64
 	result := HexRandPoints(Npoints, hexRadius)
 	/// Ensure all points are atleast MinDistance away from 0,0/center..
 
+	// fmt.Println("Mindistance is ............. ", MinDistance)
+
 	result = ForceMinDistance(result, MinDistance, hexRadius)
 	result = result.AddC(centre)
 	if rdegree == 0 {

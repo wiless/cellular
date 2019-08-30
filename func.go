@@ -345,9 +345,9 @@ func (w *WSystem) EvaluateLinkMetricV2(singlecell *deployment.DropSystem, model 
 		fid, _ := os.Create("antennaBS.dat")
 		fmt.Fprintf(fid, "%%ID\t\t\tD3d\t\t\tTx\t\t\tTy\t\t\tTz\t\t\tRx\t\t\tRy\t\t\tRz")
 		fid1, _ := os.Create("antennaAngles.dat")
-		fmt.Fprintf(fid1, "%%ID\t\tAasgainDB\t\tAasgain\t\tDirection\t\tVTilt\t\taz\t\t\tel\t\tAz\t\tEl")
+		fmt.Fprintf(fid1, "%%ID\t\tAasgainDB\t\tDirection\t\tVTilt\t\taz\t\t\tel\t\tAz\t\tEl")
 		fid2, _ := os.Create("CombineAPattern.dat")
-		fmt.Fprintf(fid2, "%%ID\t\tAasgainDB\t\tNewgain\t\tOLdgain\t\tAz\t\tEl")
+		fmt.Fprintf(fid2, "%%ID\t\tAasgainDB\t\tresult\t\tAg\t\tAz\t\tEl")
 
 		for _, val := range alltxNodeIds {
 			txnodeID := val
@@ -374,11 +374,13 @@ func (w *WSystem) EvaluateLinkMetricV2(singlecell *deployment.DropSystem, model 
 				var plerr error
 
 				if model.IsSupported(systemFrequencyGHz) && txnode.Active {
+					dist = txnode.Location.Distance2DFrom(rxnode.Location)
 
 					if rxnode.Indoor && configuration == "ruralA" {
 						d2In = rand.Float64() * 10.0
 
 					} else if rxnode.Indoor && configuration == "UrbanMacroA" {
+
 						d2In = rand.Float64() * 25.0
 					}
 
@@ -393,7 +395,6 @@ func (w *WSystem) EvaluateLinkMetricV2(singlecell *deployment.DropSystem, model 
 						otherLossDb += extraloss
 					}
 
-					dist = txnode.Location.Distance2DFrom(rxnode.Location)
 					if plerr != nil {
 						//log.Infof("EvaluateMetricV2 : (%d,%d) %v > %v", txnode.ID, rxnode.ID, pldb, plerr)
 						lossDb = DEFAULTERR_PL
@@ -429,10 +430,10 @@ func (w *WSystem) EvaluateLinkMetricV2(singlecell *deployment.DropSystem, model 
 					fmt.Fprintf(fid, "\n %d \t\t %f \t\t %f \t\t %f \t\t %f \t\t %f \t\t %f \t\t %f", txnodeID, d3d, txnode.Location.X, txnode.Location.Y, txnode.Location.Z, rxnode.Location.X, rxnode.Location.Y, rxnode.Location.Z)
 					fmt.Fprintf(fid1, "\n %d \t %f \t %f \t %f \t %f\t %f\t %f \t %f", txnodeID, aasgainDB, txnode.Direction, txnode.VTilt, az, el, Az, math.Floor(El*1000)/1000)
 					fmt.Fprintf(fid2, "\n %d \t %f \t %f \t %f\t %f\t %f", txnodeID, Aagain, result, Ag, Az, math.Floor(El*1000)/1000)
-
-					if rxRSRP > 0 || rxdebugnode {
+					rxdebugnode = true
+					if math.IsNaN(rxRSRP) && rxdebugnode {
 						rxdebugnode = true
-						fmt.Printf("\n EVAL2 Rx-Tx (LOS:%v) %d-%d rxRSRP =%v,Power=%f,AAS =%f ,PL = %f, otherLoss=%f , dist =%v", islos, rxid, txnodeID, rxRSRP, txnode.TxPowerDBm, aasgainDB, lossDb, otherLossDb, dist)
+						fmt.Printf("\n EVAL2 Rx-Tx (LOS:%v) %d-%d rxRSRP =%v,Power=%f,AAS =%f ,PL = %f, otherLoss=%f , dist =%v, d2In: =%v", islos, rxid, txnodeID, rxRSRP, txnode.TxPowerDBm, aasgainDB, lossDb, otherLossDb, dist, d2In)
 						if rxnode.Indoor || rxnode.InCar {
 							fmt.Println("\n Found in Indoor ", d2In, inloss, extraloss)
 						}
@@ -459,6 +460,7 @@ func (w *WSystem) EvaluateLinkMetricV2(singlecell *deployment.DropSystem, model 
 		/// Do the statistics here
 		if nlinks > 0 {
 			link.N0 = N0
+
 			link.BandwidthMHz = BandwidthMHz
 			rsrpLinr := vlib.InvDbF(link.TxNodesRSRP)
 			totalrssi := vlib.Sum(rsrpLinr) + vlib.InvDb(link.N0)
