@@ -254,6 +254,7 @@ func (d *DropSystem) NewNode(ntype string) *Node {
 	node.Type = notype.Name
 	node.Indoor = false
 	node.InCar = false
+
 	node.FreqGHz = []float64{FcInGHz}
 	node.AntennaType = 0
 	node.Orientation = []float64{0, 0} /// Horizontal, Vertical orientation in degree

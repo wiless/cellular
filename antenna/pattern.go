@@ -67,7 +67,7 @@ func Wrap180To180(degree float64) float64 {
 func BSPatternDb(theta, phi float64) (az, el, Ag float64) {
 	phi = Wrap0To180(phi)
 	theta = Wrap180To180(theta)
-	MaxGaindBi := 8.0 //
+	MaxGaindBi := 8.0 //    0 for ue and 8 for bs
 	theta3dB := 65.0  // degree
 	SLAmax := 30.0
 	Am := SLAmax
@@ -120,15 +120,15 @@ func CombPatternDb(theta, phi, Ag float64, Nv, Nh int) (az, el, Aa, result, old 
 func BSPatternIndoorHS_Db(theta, phi float64) (az, el, Ag float64) {
 	phi = Wrap0To180(phi)
 	theta = Wrap180To180(theta)
-	MaxGaindBi := 5.0 //
-	theta3dB := 90.0  // degree
+	MaxGaindBi := 5.0
+	theta3dB := 90.0
 	SLAmax := 25.0
 	Am := 25.0
-	MechTiltGCS := 90.0 /// Need to be set to 180.. pointing to Ground, when Antenna mounted on ceiling..
+	MechTiltGCS := 180.0 /// Need to be set to 180.. pointing to Ground, when Antenna mounted on ceiling..
 
 	Ah := -math.Min(12.0*math.Pow(theta/theta3dB, 2.0), Am)
 	Av := -math.Min(12.0*math.Pow((phi-MechTiltGCS)/theta3dB, 2.0), SLAmax)
-	result := -math.Min(-(Av+Ah), Am) + MaxGaindBi
+	result := -math.Min(-math.Floor(Av+Ah), Am) + MaxGaindBi
 
 	az = theta
 	el = phi
@@ -140,7 +140,24 @@ func BSPatternIndoorHS_Db(theta, phi float64) (az, el, Ag float64) {
 // UEPatternDb generates the antenna gain for given theta,phi
 // based OMNI Directional gain..
 func UEPatternOmniDb(theta, phi, gain float64) float64 {
-	return gain
+	phi = Wrap0To180(phi)
+	theta = Wrap180To180(theta)
+	MaxGaindBi := 0.0 //    0 for ue and 8 for bs
+	theta3dB := 65.0  // degree
+	SLAmax := 30.0
+	Am := SLAmax
+	Ah := 0.0
+	//Ah := -math.Min(12.0*math.Pow(theta/theta3dB, 2.0), Am)
+
+	MechTiltGCS := 90.0 // Pointing to Horizon..axis..
+	Av := -math.Min(12.0*math.Pow((phi-MechTiltGCS)/theta3dB, 2.0), SLAmax)
+
+	result := -math.Min(-math.Floor(Av+Ah), Am)
+	//result = Ah
+
+	Ag := result + MaxGaindBi
+
+	return Ag
 }
 
 // UEPatternDb generates the antenna gain for given theta,phi
