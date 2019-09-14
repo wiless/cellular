@@ -143,3 +143,27 @@ func CubeMirrors(r int) []vlib.Location3D {
 	//     oldcenter=newcenter;
 	// end
 }
+
+func RectGrid(NCells int, isd float64, dimensions complex128) (bsCellLocations []vlib.Location3D, vCellIDs vlib.VectorI) {
+	// kvar dimension vlib.Location3D
+	lenX := real(dimensions) //120
+	lenY := imag(dimensions) //50
+	minX := -1*lenX/2 + isd/2
+	minY := -1 * isd / 2
+
+	bsCellLocations = make([]vlib.Location3D, NCells)
+	vCellIDs = make([]int, NCells)
+	n := 0
+
+	for xInd := minX; xInd <= lenX/2; xInd += isd {
+		for yInd := minY; yInd < lenY/2; yInd += isd {
+			bsCellLocations[n].X, bsCellLocations[n].Y = float64(xInd), float64(yInd)
+			bsCellLocations[n].X, bsCellLocations[n].Y = float64(xInd), float64(yInd)
+			bsCellLocations[n].X, bsCellLocations[n].Y = float64(xInd), float64(yInd)
+			vCellIDs[n] = n
+			n++
+		}
+	}
+	// fmt.Println(bsCellLocations)
+	return bsCellLocations, vCellIDs
+}

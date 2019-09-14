@@ -52,6 +52,7 @@ type ModelSetting struct {
 func (m *ModelSetting) SetFGHz(fGHz float64) *ModelSetting {
 	m.FreqHz = fGHz * 1e9
 	m.freqGHz = fGHz
+
 	return m
 }
 
