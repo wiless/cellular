@@ -21,20 +21,21 @@ type Node struct {
 	ID       int
 	Location vlib.Location3D
 	// Height      float64	/// moved Location member variable
-	Meta         string
-	Indoor       bool
-	InCar        bool
-	IndoorCenter vlib.Location3D /// Location of the center of Building if its Indoor , assumed at Node at Center if not set
-	Orientation  vlib.VectorF
-	AntennaType  int
-	Direction    float64
-	VTilt        float64
-	GeoCellID    int
-	TxPowerDBm   float64
-	FreqGHz      vlib.VectorF
-	Mode         TxRxMode `json:"TxRxMode"`
-	alias        int
-	Active       bool
+	Meta             string
+	Indoor           bool
+	InCar            bool
+	IndoorCenter     vlib.Location3D /// Location of the center of Building if its Indoor , assumed at Node at Center if not set
+	Orientation      vlib.VectorF
+	AntennaType      int
+	Direction        float64
+	VTilt            float64
+	GeoCellID        int
+	TxPowerDBm       float64
+	FreqGHz          vlib.VectorF
+	Mode             TxRxMode `json:"TxRxMode"`
+	alias            int
+	Active           bool
+	RxNoiseFigureDbm float64 // NoiseFigure of the
 }
 
 func (n Node) Alias() int {
