@@ -81,15 +81,16 @@ func (d DropParameter) MarshalJSON() ([]byte, error) {
 }
 
 type NodeType struct {
-	Name       string
-	Hmin       float64
-	Hmax       float64
-	Count      int
-	startID    int
-	NodeIDs    vlib.VectorI `json:",strings"`
-	Params     DropParameter
-	TxPowerDBm float64
-	Direction  float64 // Direction in degree 0 to 360, for omni set to constant 'OMNIDIRECTION'
+	Name             string
+	Hmin             float64
+	Hmax             float64
+	Count            int
+	startID          int
+	NodeIDs          vlib.VectorI `json:",strings"`
+	Params           DropParameter
+	TxPowerDBm       float64
+	Direction        float64 // Direction in degree 0 to 360, for omni set to constant 'OMNIDIRECTION'
+	RxNoiseFigureDbm float64 // NoiseFigure of these type of nodes
 
 	Mode TxRxMode `json:"TxRxMode"`
 }

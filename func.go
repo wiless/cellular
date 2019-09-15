@@ -180,9 +180,10 @@ func (w *WSystem) EvaluateLinkMetricV2(singlecell *deployment.DropSystem, model 
 					rxdebugnode = true
 					if rxdebugnode && rxRSRP > -90 {
 						rxdebugnode = true
-						fmt.Printf("\n EVAL2 Rx-Tx (LOS:%v) %d-%d rxRSRP =%v,Power=%f,AAS =%f ,PL = %f, otherLoss=%f , dist =%v, d2In: =%v", islos, rxid, txnodeID, rxRSRP, txnode.TxPowerDBm, aasgainDB, lossDb, otherLossDb, dist, d2In)
+						_ = dist
+						// fmt.Printf("\n EVAL2 Rx-Tx (LOS:%v) %d-%d rxRSRP =%v,Power=%f,AAS =%f ,PL = %f, otherLoss=%f , dist =%v, d2In: =%v", islos, rxid, txnodeID, rxRSRP, txnode.TxPowerDBm, aasgainDB, lossDb, otherLossDb, dist, d2In)
 						if rxnode.Indoor || rxnode.InCar {
-							fmt.Println("\n Found in Indoor ", d2In, inloss, extraloss)
+							//	fmt.Println("\n Found in Indoor ", d2In, inloss, extraloss)
 						}
 
 					}
