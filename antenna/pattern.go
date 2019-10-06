@@ -64,6 +64,7 @@ func Wrap180To180(degree float64) float64 {
 
 // BSPatternDb generates the antenna gain for given theta,phi in degree
 // based on Table 8-6 in Report ITU-R M.2412
+// returns effective Antenna Gain Ag, Horizontal gain az, Elevation Gain el
 func BSPatternDb(theta, phi float64) (az, el, Ag float64) {
 	phi = Wrap0To180(phi)
 	theta = Wrap180To180(theta)
@@ -77,8 +78,8 @@ func BSPatternDb(theta, phi float64) (az, el, Ag float64) {
 	Av := -math.Min(12.0*math.Pow((phi-MechTiltGCS)/theta3dB, 2.0), SLAmax)
 	result := -math.Min(-math.Floor(Av+Ah), Am)
 	//result = Ah
-	az = theta
-	el = phi
+	az = Ah
+	el = Av
 	Ag = result + MaxGaindBi
 	return az, el, Ag
 }
