@@ -1,17 +1,20 @@
 package deployment
 
 import (
+	"fmt"
 	"log"
+	"math"
 
 	"github.com/wiless/vlib"
 )
 
-func HexWrapGrid(N int, center vlib.Location3D, hexsize float64, RDEGREE float64, TrueCells int) (pts []vlib.Location3D, vCellIDs vlib.VectorI) {
+func HexWrapGrid(N int, center vlib.Location3D, hexsize float64, RDEGREE float64, TrueCells int) (pts []vlib.Location3D, vCellIDs []int) {
 	directions := []vlib.Location3D{{1, -1, 0}, {1, 0, -1}, {0, +1, -1}, {-1, +1, 0}, {-1, 0, +1}, {0, -1, +1}}
 	// origin := vlib.Origin3D
 	result := make([]vlib.Location3D, N)
 	Mirrors := CubeMirrors(2)
-	vCellIDs.Resize(N)
+	fmt.Println("Mirror Table:", Mirrors)
+	vCellIDs = make([]int, N)
 	LookUpCellID := make(map[vlib.Location3D]int)
 	// cnt := 0
 	n := 1
@@ -23,65 +26,51 @@ func HexWrapGrid(N int, center vlib.Location3D, hexsize float64, RDEGREE float64
 	if RDEGREE > 0 {
 		ROTATE = 1
 	}
-
+	gap := gapmeasure(hexsize * math.Sqrt(3))
+	LookUpCellID[directions[0].Scale3D(0)] = 0
 	for r := 0; !breakloop; r++ {
 		radius := float64(r)
 		cube := directions[4+ROTATE].Scale3D(radius)
 		for i := 0; i < 6; i++ {
 			for j := 0; j < r; j++ {
-
-				result[n] = Cube2XY(cube, hexsize)
-				KK := i + ROTATE
-				if KK == 6 {
-					KK = 0
-				}
-				cube = directions[KK].Shift3D(cube)
-				// log.Printf("Index Cubes %d : %v", n, cube)
 				if n < TrueCells {
-
-					LookUpCellID[cube] = n
+					result[n] = Cube2XY(cube, hexsize)
+					result[n] = vlib.FromCmplx(result[n].Cmplx()*vlib.GetEJtheta(RDEGREE) + center.Cmplx())
+					LookUpCellID[result[n]] = n
 					vCellIDs[n] = n
-				}
-				//cnt++
-				if n >= TrueCells {
-
-					/// Loading virtual cells
-
-					d, idx, delta := ClosestMirror(Mirrors, cube)
-					vid, ok := LookUpCellID[delta]
-					_, _ = d, idx
-					vCellIDs[n] = vid
-					// log.Printf(" n=%d Closest Mirror is %d @ %v: distance %v, DELTA : %v , VID = %v", n, idx, Mirrors[idx], d, delta, vid)
-
-					if !ok {
-						log.Panic("Unable to locate Mirror ", cube, "Exra info ", d, idx, delta)
+					n++
+				} else if n >= TrueCells {
+					vid := ClosestMirror(LookUpCellID, cube, gap, vCellIDs[n-1], hexsize*math.Sqrt(3))
+					// if !ok {
+					// 	log.Panic("Unable to locate Mirror, ncell, distance ", cube, n, result[n], LookUpCellID)
+					// }
+					if vid != -10 {
+						vCellIDs[n] = vid
+						result[n] = Cube2XY(cube, hexsize)
+						result[n] = vlib.FromCmplx(result[n].Cmplx()*vlib.GetEJtheta(RDEGREE) + center.Cmplx())
+						n++
 					}
-				}
-				// fmt.Printf("\n%d %d %v", n, vCellIDs[n], result[n].Cmplx())
 
-				n = n + 1
+				} else {
+					log.Panic("HexWarpAround giving error.")
+				}
 
 				if n >= N {
 					breakloop = true
 					break
 				}
+				KK := i + ROTATE
+				if KK == 6 {
+					KK = 0
+				}
+				cube = directions[KK].Shift3D(cube)
 			}
 
 			if breakloop {
-
 				break
 			}
 		}
 	}
-	for indx, res := range result {
-		if indx != 0 {
-			result[indx] = vlib.FromCmplx(res.Cmplx()*vlib.GetEJtheta(RDEGREE) + center.Cmplx())
-		}
-	}
-
-	// log.Print Mirror centers
-	// log.Println(result)
-	//log.Printf("\nAll results grid points %f ", result)
 	return result, vCellIDs
 }
 
@@ -93,25 +82,34 @@ func Cube2XY(cube vlib.Location3D, hexsize float64) vlib.Location3D {
 	return result
 }
 
-func ClosestMirror(mirrorTable []vlib.Location3D, pt vlib.Location3D) (distance float64, indx int, dv vlib.Location3D) {
-	distance = 15000
-	indx = -1
+func gapmeasure(hexsize float64) float64 {
+	return hexsize * math.Sqrt(19)
+}
 
-	for i, c := range mirrorTable {
-		src := Cube2XY(pt, 1)
-		dest := Cube2XY(c, 1)
-		dc := dest.DistanceFrom(src)
-		// dc := (math.Abs(pt.X-c.X) + math.Abs(pt.Y-c.Y) + math.Abs(pt.Z-c.Z)) / 2.0
-		// dc := pt.DistanceFrom(c)
+func ClosestMirror(mirrorTable map[vlib.Location3D]int, pt vlib.Location3D, gap float64, prev int, ISD float64) int {
+	vid := -10
+	var center vlib.Location3D
+	for c, i := range mirrorTable {
+		src := Cube2XY(pt, ISD/math.Sqrt(3))
+		src = vlib.FromCmplx(src.Cmplx()*vlib.GetEJtheta(30) + center.Cmplx())
+		distance := c.Distance2DFrom(src)
+		// fmt.Println("source , destination:", src, c)
+		// fmt.Println("gap,distance:", gap, distance)
+		if math.Abs(gap-distance) < 1 {
+			if (src.X > 0 && src.Y > 0) || (src.X > 0 && math.Abs(src.Y) < 1) {
+				if (math.Abs(c.Y-src.Y)-ISD) < 1 && (math.Abs(c.X-src.X)-4*ISD) < 1 {
+					vid = i
+					return vid
+				}
+			}
+			if prev != i {
+				vid = i
 
-		// log.Println("Index %d", i, c, dc)
-		if distance > dc {
-			distance = dc
-			indx = i
-			dv.SetXYZ(pt.X-c.X, pt.Y-c.Y, pt.Z-c.Z)
+			}
+
 		}
 	}
-	return distance, indx, dv
+	return vid
 }
 
 func CubeMirrors(r int) []vlib.Location3D {
