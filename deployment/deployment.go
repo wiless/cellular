@@ -21,20 +21,21 @@ type Node struct {
 	ID       int
 	Location vlib.Location3D
 	// Height      float64	/// moved Location member variable
-	Meta         string
-	Indoor       bool
-	InCar        bool
-	IndoorCenter vlib.Location3D /// Location of the center of Building if its Indoor , assumed at Node at Center if not set
-	Orientation  vlib.VectorF
-	AntennaType  int
-	Direction    float64
-	VTilt        float64
-	GeoCellID    int
-	TxPowerDBm   float64
-	FreqGHz      vlib.VectorF
-	Mode         TxRxMode `json:"TxRxMode"`
-	alias        int
-	Active       bool
+	Meta             string
+	Indoor           bool
+	InCar            bool
+	IndoorCenter     vlib.Location3D /// Location of the center of Building if its Indoor , assumed at Node at Center if not set
+	Orientation      vlib.VectorF
+	AntennaType      int
+	Direction        float64
+	VTilt            float64
+	GeoCellID        int
+	TxPowerDBm       float64
+	FreqGHz          vlib.VectorF
+	Mode             TxRxMode `json:"TxRxMode"`
+	alias            int
+	Active           bool
+	RxNoiseFigureDbm float64 // NoiseFigure of the
 }
 
 func (n Node) Alias() int {
@@ -80,15 +81,16 @@ func (d DropParameter) MarshalJSON() ([]byte, error) {
 }
 
 type NodeType struct {
-	Name       string
-	Hmin       float64
-	Hmax       float64
-	Count      int
-	startID    int
-	NodeIDs    vlib.VectorI `json:",strings"`
-	Params     DropParameter
-	TxPowerDBm float64
-	Direction  float64 // Direction in degree 0 to 360, for omni set to constant 'OMNIDIRECTION'
+	Name             string
+	Hmin             float64
+	Hmax             float64
+	Count            int
+	startID          int
+	NodeIDs          vlib.VectorI `json:",strings"`
+	Params           DropParameter
+	TxPowerDBm       float64
+	Direction        float64 // Direction in degree 0 to 360, for omni set to constant 'OMNIDIRECTION'
+	RxNoiseFigureDbm float64 // NoiseFigure of these type of nodes
 
 	Mode TxRxMode `json:"TxRxMode"`
 }
