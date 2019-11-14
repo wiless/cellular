@@ -3,6 +3,8 @@ package antenna
 import (
 	"math"
 	cmplx "math/cmplx"
+
+	"github.com/wiless/vlib"
 )
 
 // func BSPatternDb(theta, phi, gain float64) float64 {
@@ -89,27 +91,63 @@ func CombPatternDb(theta, phi, Ag float64, Nv, Nh int) (az, el, Aa, result, old 
 	phi = Wrap0To180(phi)
 	theta = Wrap180To180(theta)
 	hspace := 0.5
-	vspace := 0.9
-	dtilt := 9.0   // degree
-	descan := 25.0 //degree
+	vspace := 0.8
+	dtilt := 100.0  // degree
+	descan := 120.0 //degree
 	var sum = complex(0.0, 0.0)
 
-	for m := 1; m < Nh; m++ {
-		for n := 1; n < Nv; n++ {
-
-			//Nv rows Nh columns
-
-			w := complex(1/math.Pow(float64(Nh*Nv), 1/2), 0) * cmplx.Exp(complex(0, 2*math.Pi*(float64(n-1)*vspace*math.Sin(dtilt*math.Pi/180)-float64(m-1)*hspace*math.Cos(dtilt*math.Pi/180)*math.Sin(descan*math.Pi/180))))
-			v := cmplx.Exp(complex(0, 2*math.Pi*(float64(n-1)*vspace*math.Cos(phi*math.Pi/180)+float64(m-1)*hspace*math.Sin(phi*math.Pi/180)*math.Sin(theta*math.Pi/180))))
-
+	for m := 0; m < Nh; m++ {
+		for n := 0; n < Nv; n++ {
+			w := complex(1/math.Pow(float64(Nh*Nv), 1/2), 0) * cmplx.Exp(complex(0, 2*math.Pi*(float64(n)*vspace*math.Sin(dtilt*math.Pi/180)-float64(m)*hspace*math.Cos(dtilt*math.Pi/180)*math.Sin(descan*math.Pi/180))))
+			v := cmplx.Exp(complex(0, 2*math.Pi*(float64(n)*vspace*math.Cos(phi*math.Pi/180)+float64(m)*hspace*math.Sin(phi*math.Pi/180)*math.Sin(theta*math.Pi/180))))
 			sum = sum + w*v
-
 		}
-
 	}
 
 	result = 10 * math.Log10(math.Pow(cmplx.Abs(sum), 2))
+	az = theta
+	el = phi
+	Aa = Ag + result
+	return az, el, Aa, result, Ag
+}
 
+//Analogy Beamforming antenna array gain
+func AnalogBeamDb(theta, phi float64, nv, nh int) (az, el, Aa, result, old float64) {
+	pi := math.Pi
+	azimuth := vlib.VectorF{-5 * pi / 16, -3 * pi / 16, -pi / 16, pi / 16, 3 * pi / 16, 5 * pi / 16}
+	azimuth = azimuth.Scale(180 / pi)
+	zenith := vlib.VectorF{5 * pi / 8, 7 * pi / 8}
+	zenith = zenith.Scale(180 / pi)
+	az, el, aasgain := BSPatternDb(theta, phi)
+	reaz := azimuth.Sub(az)
+	aasgainDB := vlib.NewVectorF(12)
+	for j := 0; j < reaz.Len(); j++ {
+		for i := 0; i < zenith.Len(); i++ {
+			_, _, aas, _, _ := UMaCombPatternDb(reaz[j], zenith[i], el, aasgain, 4, 8)
+			aasgainDB.AppendAtEnd(aas)
+		}
+	}
+	aas := aasgainDB.Sorted()
+	return theta, phi, aas[0], 0, aasgain
+}
+
+//CombPatternDb calculates combine antenna pattern gain
+func UMaCombPatternDb(theta, zenith, phi, Ag float64, Nv, Nh int) (az, el, Aa, result, old float64) {
+	hspace := 0.5
+	vspace := 0.8
+	dtilt := zenith // degree
+	descan := 22.5  //degree
+	var sum = complex(0.0, 0.0)
+
+	for m := 0; m < Nh; m++ {
+		for n := 0; n < Nv; n++ {
+			w := complex(1/math.Pow(float64(Nh*Nv), 1/2), 0) * cmplx.Exp(complex(0, 2*math.Pi*(float64(n)*vspace*math.Sin(dtilt*math.Pi/180)-float64(m)*hspace*math.Cos(dtilt*math.Pi/180)*math.Sin(descan*math.Pi/180))))
+			v := cmplx.Exp(complex(0, 2*math.Pi*(float64(n)*vspace*math.Cos(phi*math.Pi/180)+float64(m)*hspace*math.Sin(phi*math.Pi/180)*math.Sin(theta*math.Pi/180))))
+			sum = sum + w*v
+		}
+	}
+
+	result = 10 * math.Log10(math.Pow(cmplx.Abs(sum), 2))
 	az = theta
 	el = phi
 	Aa = Ag + result
