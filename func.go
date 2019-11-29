@@ -154,7 +154,7 @@ func (w *WSystem) EvaluateLinkMetricV2(singlecell *deployment.DropSystem, model 
 					// // aasgainDB = aasgain2
 					//Again = aasgainDB
 
-					rxRSRP = aasgainDB + txnode.TxPowerDBm - 30 - lossDb - otherLossDb
+					rxRSRP = aasgainDB + txnode.TxPowerDBm - lossDb - otherLossDb
 
 					// if rxid == len(alltxNodeIds) {
 					// 	fid, _ := os.Create("Rxlocation.dat")
@@ -317,6 +317,7 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 					}
 
 					lossDb, islos, plerr = model.PLbetweenIndoor(txnode.Location, rxnode.Location, d2In)
+
 					if rxnode.Indoor {
 						inloss = model.O2ILossDb(systemFrequencyGHz, d2In)
 						otherLossDb += inloss

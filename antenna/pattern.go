@@ -135,7 +135,6 @@ func BSPatternIndoorHS_Db(theta, phi float64) (az, el, Ag float64) {
 	el = phi
 	Ag = result
 	return az, el, Ag
-
 }
 
 // UEPatternDb generates the antenna gain for given theta,phi

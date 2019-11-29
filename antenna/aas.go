@@ -2,96 +2,99 @@
 package antenna
 
 import (
+	"github.com/jvlmdr/lin-go/zvec"
 	"encoding/json"
-	"io"
 	"log"
+	"math/cmplx"
+	"os"
+
+	"gonum.org/v1/gonum/mat"
+
+	"gonum.org/v1/gonum/blas/cblas128"
 
 	// "flag"
 	"fmt"
 	"math"
-	"math/cmplx"
 
 	"github.com/wiless/vlib"
 )
 
-var Nodes = 360
-var Radius float64 = 1
+type cvec cblas128.Vector
 
-var imagval complex128 = 0 + 1i
-
-var freq float64 = 2.0e9
-var cspeed float64 = 3.0e8
-var mfileName string
-
-// var omni bool
-
-var Bobwriter io.Writer
-
-// var VBeamWidth, HBeamWidth float64 = 65, 65
-
-type SettingAAS struct {
-	UID                              string `datastore:"-" json:"uid"`
-	NodeID                           int    // Associated Node ID where relevant
-	elementLocations                 []vlib.Location3D
-	lamda                            float64
-	FreqHz                           float64
-	hColumns                         float64 // To be exported later
-	N                                int
-	Nodes                            int
-	Omni                             bool
-	MfileName                        string
-	VTiltAngle                       float64
-	HTiltAngle                       float64
-	BeamTilt                         float64
-	DisableBeamTit                   bool
-	HoldOn                           bool
-	VBeamWidth, HBeamWidth           float64
-	SLAV                             float64
-	ESpacingVFactor, ESpacingHFactor float64
-	Centre                           vlib.Location3D
-	weightVector                     vlib.VectorC
-	AASArrayType                     ArrayType
-	CurveWidthInDegree               float64
-	CurveRadius                      float64
-	GainDb                           float64
+type Dim struct {
+	R, C int
 }
 
-func (s *SettingAAS) SetDefault() {
-	s.FreqHz = 2.0e9
-	s.N = 1
-	s.Nodes = 360
-	s.Omni = false
-	s.MfileName = "output.m"
-	s.VTiltAngle = 14
-	s.HTiltAngle = 0
-	s.HBeamWidth = 65
-	s.VBeamWidth = 65
-	s.SLAV = 30.0
-	s.lamda = cspeed / freq
-	s.ESpacingHFactor = 0 /// Factor mulplied by params.lamda
-	s.ESpacingVFactor = .5
-	s.AASArrayType = LinearPhaseArray
-	s.CurveRadius = 0
-	s.CurveWidthInDegree = 0
-	s.GainDb = 0
+type Beam struct {
+	HEtilt float64 // in radians
+	VEtilt float64 // in radians
+	Index  int
+	W      mat.CDense
+	V      mat.CDense
 }
 
-func NewAAS() *SettingAAS {
-	result := new(SettingAAS)
-	result.SetDefault()
-	return result
+// Element represents an Antenna element, with horiontal and vertical normalized to 0,0. (horizon=0, vertical=0) and unit gain
+type Element struct {
+	VBeamWidth, HBeamWidth float64 // H & V beamwidth of antenna element
+	HDirection             float64
+	VDirection             float64
+	GainDb                 float64 // ElementGain in dBi
+	SLAV                   float64
+	Omni                   bool
 }
 
-func (s *SettingAAS) Set(str string) {
-	err := json.Unmarshal([]byte(str), s)
+// AAS is the Active Antenna system supporting multiple TxRU and weights based on 3GPP & M.2412
+type AAS struct {
+	elementLocations   []vlib.Location3D
+	lamda              float64         // wavelength
+	FreqGHz            float64         // Frequency of operation in GHz
+	Size               Dim             // MxN Number of  M=vertical/rows & N=horizontal/columns elements
+	NumTxRU            Dim             // MxN Number of  M=vertical/rows & N=horizontal/columns elements
+	Polarization       int             // True if P=2, that dual Polarized
+	vTiltAngle         float64         // Orientation : Mechanical-Vertical Tilt w.r.t Horizon
+	hTiltAngle         float64         //  Orientation :  Mechanical-Horizontal Direction (usually same as sector direction, exceptional case indoor, rooftop etc)
+	HSpacing, VSpacing float64         // Horizontal & Vertical Spacing of antenna elements as fraction of Lamda
+	Centre             vlib.Location3D // Center position of the AAS Panel
+	w                  vlib.VectorC
+	v                  vlib.VectorC
+	SizeTxRU           Dim    // Nof elements RxC in a TxRU, when all TXRU are of same dimentions
+	AASArrayType       string // Only supports Type="URA" Uniform Rectangular Array
+	Beams              []Beam
+	elem               Element
+}
+
+// NewAASsimple initializes an AAS with MxN Rectangular Antenna Array, with HTx
+// with f=4GHz , single element
+func NewAASsimple(gdB float64) *AAS {
+	a := new(AAS)
+	a.Init(4.0, 1, 1, 1, 1, 1, gdB) // Assuming default 4GHz
+
+	return a
+}
+
+// Init initializes an AAS with MxN Rectangular Antenna Array, with HTx, element Gain
+func (a *AAS) Init(fGHz float64, M, N, P, HTxRU, VTxRU int, gdB float64) {
+	a.FreqGHz = fGHz
+	a.Size = Dim{M, N}
+	a.NumTxRU = Dim{HTxRU, VTxRU}
+	a.lamda = SPEEDOFLIGHT / freq
+	a.HSpacing = 0 /// Factor mulplied by parama.lamda
+	a.VSpacing = .5
+	a.elem.GainDb = gdB // 0dBi Element
+}
+
+// Set sets
+func (a *AAS) Set(str string) {
+	err := json.Unmarshal([]byte(str), a)
 	if err != nil {
 		log.Print("Error ", err)
 	}
 }
 
-func (s *SettingAAS) Get() string {
+// Get gets
+func (a *AAS) Get() string {
 
-	bytes, err := json.Marshal(s)
+	bytes, err := json.Marshal(a)
 	if err != nil {
 		return ""
 	} else {
@@ -99,394 +102,122 @@ func (s *SettingAAS) Get() string {
 	}
 }
 
-func init() {
+// Check checks with the AAS is initialized
+func (a AAS) Check() bool {
+	if a.lamda == 0 {
+		return false
+	} else {
 
-	// flag.Float64Var(&freq, "fc", 2.0e9, "Carrier Frequency in Hz (not GHz)")
-	// flag.IntVar(&N, "N", 1, "No. of Element array")
-	// flag.IntVar(&Nodes, "Nodes", 360, "No. of Samples in 2*pi ")
-	// flag.BoolVar(&omni, "omni", false, "Default uses 3GPP Element pattern TR37.840, Set true for ideal omnidirectional")
-	// flag.StringVar(&mfileName, "mfile", "output.m", "Name of .m file to be created")
-}
-
-// func (s SettingAAS) SayHello() {
-// 	fmt.Printf("\n ========== Simulator SAYS HELLO %v\n   ==========", s)
-// }
-
-func RunJSON(jstring string) {
-	var s SettingAAS
-	err := json.Unmarshal([]byte(jstring), &s)
-	if err != nil {
-		log.Print("Error ", err)
-		return
-
+		if len(a.w) == 0 || len(a.v) == 0 {
+			return false
+		} else {
+			return true
+		}
 	}
-	fmt.Printf("Wowf %v is this %v", jstring, s)
-	// RunAAS(s)
-}
-func GetLamda(freq float64) float64 {
-	return cspeed / freq
 }
 
-func (params *SettingAAS) GetLamda() float64 {
-	return params.lamda
-}
-func (params *SettingAAS) CreateLinearElements(centre vlib.Location3D) {
-
-	if params.N == 0 {
-		log.Panicln("Antenna:Create Elements - ZERO   !!")
-		return
-	}
-	params.Centre = centre
-	params.lamda = cspeed / params.FreqHz
-	dv := params.ESpacingVFactor * params.lamda
-	// dh := params.ESpacingHFactor * params.lamda
-	params.elementLocations = make([]vlib.Location3D, params.N)
-	// = dropLinearNodes(params.N, dv, 0)
-	//rotateTilt := GetEJtheta(params.VTiltAngle) // cmplx.Exp(complex(0, -(params.VTiltAngle)*math.Pi/180.0))
-	for i := 0; i < params.N; i++ {
-		params.elementLocations[i].X = centre.X
-		params.elementLocations[i].Y = centre.Y
-		params.elementLocations[i].Z = centre.Z + dv*float64(i) - float64(params.N-1)*dv/2.0
-
-		// rotatedpos := params.elementLocations[i].Cmplx() * rotateTilt
-		// params.elementLocations[i].FromCmplx(rotatedpos)
+// BeamGain returns the gain of all the TxRU in the AAS w.r.t dest location
+// NOTE : Caution using this function, the antenna orientation and position should be set same as Sector Direction, Sector-Node location
+func (a *AAS) BeamGain(dest vlib.Location3D) (Port0Gain float64, effectiveThetaH, effectiveThetaV float64, TxRuGains [][]float64, err error) {
+	if !a.Check() {
+		err := fmt.Errorf("BeamGain:AAS not initialized")
+		return Port0Gain, effectiveThetaH, effectiveThetaV, TxRuGains, err
 	}
 
-	// for i := 0; i < params.N; i++ {
-	// 	params.elementLocations[i].X += centre.X
-	// 	params.elementLocations[i].Y += centre.Y
+	// AntennaElementLocations := vlib.Location3DtoVecC(params.elementLocations)
 
+	// // w =
+
+	// w:=a.w //params.FindWeights(params.BeamTilt)
+	// if a.DisableBeamTit {
+	// 	w = vlib.NewOnesC(AntennaElementLocations.Size())
 	// }
+	// w = w.Scale(math.Sqrt(1.0 / float64(params.N)))
 
-	params.weightVector = params.FindWeights(params.BeamTilt)
-}
+	// // fmt.Print(AntennaElementLocations)
+	// phaseDelay := vlib.NewVectorF(AntennaElementLocations.Size())
+	// var Rxcomponent complex128
+	// Rxcomponent = 0.0
+	// var dist, thetaH, thetaV float64
+	// var aGain complex128
 
-func (params *SettingAAS) CreateCircularElements(centre vlib.Location3D) {
+	// for i := 0; i < a.N; i++ {
+	// 	// dist, thetaH, thetaV := vlib.RelativeGeo(params.elementLocations[i], dest)
+	// 	dist, thetaH, thetaV = vlib.RelativeGeo(params.Centre, dest)
 
-	if params.N == 0 {
-		log.Panicln("AAS Zero elements")
-		return
-	}
+	// 	// dist= cmplx.Abs(params.elementLocations[i].Cmplx()-dest.Cmplx())
+	// 	aGain = complex((params.ElementEffectiveGain(thetaH, thetaV)), 0)
 
-	if params.CurveWidthInDegree == 0 || params.CurveRadius == 0 {
-		log.Panicln("AAS Set to Circular Mode with other params=0")
-		return
-	}
+	// 	_, phaseDelay[i] = math.Modf(2 * math.Pi * dist / params.lamda)
 
-	params.Centre = centre
-	params.lamda = cspeed / freq
-
-	// dv := params.ESpacingVFactor * params.lamda
-	// dh := params.ESpacingHFactor * params.lamda
-	params.elementLocations = make([]vlib.Location3D, params.N)
-
-	steps := params.CurveWidthInDegree / float64(params.N)
-	// = dropLinearNodes(params.N, dv, 0)
-	rotateTilt := GetEJtheta(params.VTiltAngle - params.CurveWidthInDegree/2.0 + steps/2) // cmplx.Exp(complex(0, -(params.VTiltAngle)*math.Pi/180.0))
-	degree := 0.0
-	// -params.CurveWidthInDegree / 2.0
-
-	for i := 0; i < params.N; i++ {
-
-		point := GetEJtheta(degree)
-		point *= complex(params.CurveRadius, 0)
-		params.elementLocations[i].X = centre.X + real(point)
-		params.elementLocations[i].Y = centre.Y + imag(point)
-		params.elementLocations[i].Z = centre.Z //+ dv*float64(i) - float64(params.N-1)*dv/2.0
-
-		rotatedpos := params.elementLocations[i].Cmplx() * rotateTilt
-		params.elementLocations[i].FromCmplx(rotatedpos)
-		degree += steps
-	}
-	// fmt.Printf("\n AAS Elem %d locations :  %v", params.N, params.elementLocations)
-	params.weightVector = params.FindWeights(params.BeamTilt)
-}
-
-func (params *SettingAAS) GetElements() []vlib.Location3D {
-	return params.elementLocations
-}
-
-func (params *SettingAAS) CreateElements(centre vlib.Location3D) {
-
-	if params.AASArrayType == LinearPhaseArray {
-		params.CreateLinearElements(centre)
-	}
-
-	if params.AASArrayType == CircularPhaseArray {
-		params.CreateCircularElements(centre)
-	}
-
-}
-
-/// Returns the Phase of the Signal at the given location from all its elements after applying weights at its elements
-func (params *SettingAAS) GetRxPhase(dest vlib.Location3D) []complex128 {
-	result := vlib.NewVectorC(params.N)
-	params.lamda = GetLamda(params.FreqHz)
-	for indx, src := range params.elementLocations {
-		d, theh, thev := vlib.RelativeGeo(src, dest)
-		elemGain := complex((params.ElementEffectiveGain(theh, thev)), 0)
-		_, phaseDelay := math.Modf(2 * math.Pi * (d / params.lamda)) // returns the fractional part
-		phaseDelay = vlib.ToDegree(phaseDelay)
-
-		result[indx] = GetEJtheta(phaseDelay) * elemGain
-	}
-	return result
-}
-
-// AASGain2 returns the AAS gain for the given azimuth and elevation angle (degrees), gain in dB
-func (params *SettingAAS) AASGain2(thetaH, thetaV float64) (gaindB float64) {
-	// src := params.MyLocation()
-
-	params.lamda = cspeed / params.FreqHz
-	AntennaElementLocations := vlib.Location3DtoVecC(params.elementLocations)
-
-	w := params.weightVector //params.FindWeights(params.BeamTilt)
-	if params.DisableBeamTit {
-		w = vlib.NewOnesC(AntennaElementLocations.Size())
-		// fmt.Printf("Disable Beam tilt")
-	}
-	w = w.Scale(math.Sqrt(1.0 / float64(params.N)))
-	phaseDelay := vlib.NewVectorF(AntennaElementLocations.Size())
-	var Rxcomponent complex128
-	Rxcomponent = 0.0
-	dist := 10.0
-	// fmt.Printf("\n Weights : %v", w)
-	for i := 0; i < params.N; i++ {
-		// dist, thetaH, thetaV := vlib.RelativeGeo(params.elementLocations[i], dest)
-		// dist= cmplx.Abs(params.elementLocations[i].Cmplx()-dest.Cmplx())
-		aGain := complex((params.ElementEffectiveGain(thetaH, thetaV)), 0)
-		_, phaseDelay[i] = (math.Modf(2 * math.Pi * dist / params.lamda))
-		Rxcomponent += GetEJtheta(vlib.ToDegree(phaseDelay[i])) * w[i] * aGain
-	}
-	gaindB = vlib.Db(math.Pow(cmplx.Abs(Rxcomponent), 2)) + params.GainDb
-
-	return gaindB
-
-}
-
-func (params *SettingAAS) AASGain(dest vlib.Location3D) (gain float64, effectiveThetaH, effectiveThetaV float64) {
-	// src := params.MyLocation()
-
-	params.lamda = cspeed / params.FreqHz
-	AntennaElementLocations := vlib.Location3DtoVecC(params.elementLocations)
-
-	// w =
-
-	w := params.weightVector //params.FindWeights(params.BeamTilt)
-	if params.DisableBeamTit {
-		w = vlib.NewOnesC(AntennaElementLocations.Size())
-	}
-	w = w.Scale(math.Sqrt(1.0 / float64(params.N)))
-
-	// fmt.Print(AntennaElementLocations)
-	phaseDelay := vlib.NewVectorF(AntennaElementLocations.Size())
-	var Rxcomponent complex128
-	Rxcomponent = 0.0
-	var dist, thetaH, thetaV float64
-	var aGain complex128
-
-	for i := 0; i < params.N; i++ {
-		// dist, thetaH, thetaV := vlib.RelativeGeo(params.elementLocations[i], dest)
-		dist, thetaH, thetaV = vlib.RelativeGeo(params.Centre, dest)
-
-		// dist= cmplx.Abs(params.elementLocations[i].Cmplx()-dest.Cmplx())
-		aGain = complex((params.ElementEffectiveGain(thetaH, thetaV)), 0)
-
-		_, phaseDelay[i] = math.Modf(2 * math.Pi * dist / params.lamda)
-
-		Rxcomponent += GetEJtheta(vlib.ToDegree(phaseDelay[i])) * w[i] * aGain
-	}
+	// 	Rxcomponent += GetEJtheta(vlib.ToDegree(phaseDelay[i])) * w[i] * aGain
+	// }
 
 	// gain = math.Pow(cmplx.Abs(Rxcomponent), 1)
-	gain = cmplx.Abs(Rxcomponent) // validate @ssk - May 28th 2017
-	dist, thetaH, thetaV = vlib.RelativeGeo(params.Centre, dest)
+	// gain = cmplx.Abs(Rxcomponent) // validate @ssk - May 28th 2017
+	// dist, thetaH, thetaV = vlib.RelativeGeo(params.Centre, dest)
 
-	if gain > vlib.InvDb(params.GainDb) {
-		log.Printf("\n AAS  : Rx complex = %v Rx |aGain  %v | %v  | %v limit at dist=%v", Rxcomponent, gain, vlib.InvDb(params.GainDb), dist)
-	}
-	return gain, thetaH, thetaV
-
-}
-
-func RunAAS(params SettingAAS) {
-	// fmt.Printf("\n AAS Parameters : \n %#v \n====", params)
-	freq = params.FreqHz
-	N := params.N
-	Nodes = params.Nodes
-	mfileName = params.MfileName
-	// omni := params.Omni
-	// flag.Parse()
-	// TiltAngle = params.VTiltAngle
-
-	params.lamda = cspeed / freq
-
-	// AntennaElementLocations := dropLinearNodes(N, params.lamda/2.0, 0)
-	params.CreateElements(vlib.Origin3D)
-	AntennaElementLocations := vlib.Location3DtoVecC(params.elementLocations)
-	// WeightVector := vlib.NewVectorF(N)
-	// for i := 0; i < N; i++ {
-	// 	WeightVector[i] = rand.Float64() * 2 * math.Pi
-
-	// 	// WeightVector[i] = 1.0 / math.Sqrt(float64(N))
-
+	// if gain > vlib.InvDb(params.GainDb) {
+	// 	log.Printf("\n AAS  : Rx complex = %v Rx |aGain  %v | %v  | %v limit at dist=%v", Rxcomponent, gain, vlib.InvDb(params.GainDb), dist)
 	// }
-	AntennaElementLocations = AntennaElementLocations.AddC(-vlib.MeanC(AntennaElementLocations))
-	rotateTilt := cmplx.Exp(complex(0, -(params.VTiltAngle)*math.Pi/180.0))
-	AntennaElementLocations = AntennaElementLocations.ScaleC(rotateTilt)
-
-	WeightVector := params.FindWeights(params.BeamTilt)
-	if params.DisableBeamTit {
-		WeightVector = vlib.NewOnesC(AntennaElementLocations.Size())
-	}
-	WeightVector = WeightVector.Scale(math.Sqrt(1.0 / float64(N)))
-	fmt.Printf("\nWeights  = %f", WeightVector)
-
-	NodeLocations := dropCircularNodes(Nodes, Radius)
-	meanvalue := vlib.MeanC(AntennaElementLocations)
-	NodeLocations = NodeLocations.AddC(meanvalue)
-	fmt.Println("Mid = ", meanvalue)
-	// fmt.Printf("\nNodeLocations = %f ", NodeLocations)
-
-	/// Evaluate
-
-	Gains := vlib.NewVectorF(NodeLocations.Size())
-
-	for nindx, pos := range NodeLocations {
-
-		var gain complex128 //:= vlib.NewVectorF(AntennaElementLocations.Size())
-		// gain = 1.0
-		phaseDelay := vlib.NewVectorF(AntennaElementLocations.Size())
-		for eindx, epos := range AntennaElementLocations {
-			dist := cmplx.Abs(epos - pos)
-			_, phaseDelay[eindx] = math.Modf(dist / params.lamda)
-			phaseDelay[eindx] *= (2.0 * math.Pi) //+ WeightVector[eindx]
-			jtheta := complex(0.0, phaseDelay[eindx])
-			phyElementDirection := vlib.ToDegree(cmplx.Phase(epos))
-			// phyElementDirection *= -1
-			directionGain := math.Sqrt(params.ElementDirectionGain(phyElementDirection + cmplx.Phase(pos-epos)))
-
-			if cmplx.Phase(pos) == 0 {
-				gain += complex(directionGain, 0) // * cmplx.Exp(-jtheta) * WeightVector[eindx]
-
-			} else {
-				gain += complex(directionGain, 0) * cmplx.Exp(-jtheta) * WeightVector[eindx]
-			}
-		}
-		// fmt.Printf("\n Phase[%d]=%v", nindx, phaseDelay)
-		Gains[nindx] = cmplx.Abs(gain) * cmplx.Abs(gain) / Radius
-
-		// fmt.Println("%Result : ", nindx, phaseDelay)
-
-	}
-	// locs := NodeLocations.Scale(Radius)
-
-	// matlab := vlib.NewMatlab(mfileName)
-	var matlab vlib.Matlab
-	matlab.SetDefaults()
-
-	if Bobwriter != nil {
-		matlab.SetWriter(Bobwriter)
-	} else {
-		matlab.SetFile(params.MfileName)
-	}
-	matlab.Silent = true
-	matlab.Export("Weights", WeightVector)
-	matlab.Export("AntennaLocations", AntennaElementLocations)
-	matlab.Export("Locations", NodeLocations)
-	matlab.Export("Gain", Gains)
-	matlab.Export("N", N)
-	matlab.Export("Lamda", params.lamda)
-	matlab.Command("\npattern=(Locations.*sqrt(Gain ));")
-	if !params.HoldOn {
-		matlab.Command("figure;")
-		// matlab.Command("plot(real(pattern),imag(pattern ),'k-')")
-		// matlab.Command("hold on")
-		// matlab.Command("axis([-15 +15 -15 +15]);")
-
-	}
-	matlab.Command("plot(real(AntennaLocations ),imag(AntennaLocations ),'r*');")
-	matlab.Command("grid on;")
-	if !params.HoldOn {
-
-		matlab.Command("figure;")
-	}
-	matlab.Command("polar(angle(pattern),abs(pattern ),'k-')")
-
-	matlab.Close()
-
+	// return gain, thetaH, thetaV
+	return 0, 0, 0, nil, nil
 }
 
-func GetEJtheta(degree float64) complex128 {
-	return cmplx.Exp(complex(0.0, -degree*math.Pi/180.0))
-}
+// func (a *AAS) oldFindWeights(theta float64) vlib.VectorC {
+// 	WeightVectors := vlib.NewVectorC(params.N)
+// 	// var gain complex128
+// 	AE := vlib.Location3DtoVecC(params.elementLocations)
+// 	meanpos := vlib.MeanC(AE)
+// 	pos := GetEJtheta(theta) + meanpos
+// 	// gain := complex(1.0/math.Sqrt(float64(N)), 0)
+// 	phaseDelay := vlib.NewVectorF(AE.Size())
+// 	for eindx, epos := range AE {
+// 		dist := cmplx.Abs(epos - pos)
+// 		_, phaseDelay[eindx] = math.Modf(dist / params.lamda)
+// 		phaseDelay[eindx] *= (2.0 * math.Pi)
+// 		WeightVectors[eindx] = cmplx.Exp(complex(0.0, -phaseDelay[eindx]))
 
-func Radian(degree float64) float64 {
-	return degree * math.Pi / 180.0
-}
+// 	}
+// 	return WeightVectors
+// }
 
-func (params *SettingAAS) oldFindWeights(theta float64) vlib.VectorC {
-	WeightVectors := vlib.NewVectorC(params.N)
-	// var gain complex128
-	AE := vlib.Location3DtoVecC(params.elementLocations)
-	meanpos := vlib.MeanC(AE)
-	pos := GetEJtheta(theta) + meanpos
-	// gain := complex(1.0/math.Sqrt(float64(N)), 0)
-	phaseDelay := vlib.NewVectorF(AE.Size())
-	for eindx, epos := range AE {
-		dist := cmplx.Abs(epos - pos)
-		_, phaseDelay[eindx] = math.Modf(dist / params.lamda)
-		phaseDelay[eindx] *= (2.0 * math.Pi)
-		WeightVectors[eindx] = cmplx.Exp(complex(0.0, -phaseDelay[eindx]))
+// func (a *AAS) FindWeights(theta float64) vlib.VectorC {
+// 	// for nindx, pos := range NodeLocations {
 
-	}
-	return WeightVectors
-}
-func (params *SettingAAS) FindWeights(theta float64) vlib.VectorC {
-	// for nindx, pos := range NodeLocations {
+// 	WeightVectors := vlib.NewVectorC(params.N)
 
-	WeightVectors := vlib.NewVectorC(params.N)
+// 	for i := 0; i < params.N; i++ {
+// 		m := float64(i)
+// 		arg := complex(0, 2*math.Pi*(m-1)*params.lamda/2.0*math.Cos(Radian(theta+90))/params.lamda)
+// 		WeightVectors[i] = cmplx.Exp(arg)
+// 	}
+// 	return WeightVectors
 
-	for i := 0; i < params.N; i++ {
-		m := float64(i)
-		arg := complex(0, 2*math.Pi*(m-1)*params.lamda/2.0*math.Cos(Radian(theta+90))/params.lamda)
-		WeightVectors[i] = cmplx.Exp(arg)
-	}
-	return WeightVectors
-
-}
+// }
 
 // Angle expected between -180 to 180 / in Linear Scale
-func (s SettingAAS) ElementDirectionHGain(degree float64) float64 {
-	if s.Omni {
-		return 1.0
+// returns the gain in dB
+func (e Element) HGain(degree float64) float64 {
+	if e.Omni {
+		return e.GainDb
 	}
 	degree = Wrap180To180(degree)
-	// fmt.Println("Origina ", degree)
-	// if degree > 180 {
-	// 	rem := math.Mod(degree, 180.0)
-	// 	degree = -180 + rem
-
-	// } else if degree < -180 {
-	// 	rem := math.Mod(degree, 180.0)
-	// 	//	fmt.Println("Remainder for ", degree, rem)
-	// 	degree = 180 + rem
-	// }
 	theta := -(degree)
 
-	theta3Db := (s.HBeamWidth)
-	SLAV := s.SLAV
-	tilt := -(s.HTiltAngle)
+	theta3Db := (e.HBeamWidth)
+	SLAV := e.SLAV
+	tilt := -(e.HDirection)
 	//  Reference TS25.996 - Section 4.5 - BS Antenna Pattern
 	val := math.Pow(10, -math.Min(12.0*math.Pow((theta-tilt)/theta3Db, 2), SLAV)/10.0)
 	return val
 }
 
-// Angle expected between 0 to 180 / in Linear Scale
-func (s SettingAAS) ElementDirectionVGain(degree float64) float64 {
-	if s.Omni {
-		return 1.0
+// VGain Angle expected between 0 to 180 / in Linear Scale
+func (e Element) VGain(degree float64) float64 {
+	if e.Omni {
+		return e.GainDb
 	}
-
 	//degree = Wrap0To180(degree)
 	if degree > 180 {
 		rem := math.Mod(degree, 180.0)
@@ -497,80 +228,148 @@ func (s SettingAAS) ElementDirectionVGain(degree float64) float64 {
 	}
 
 	theta := (degree)
-	theta3Db := s.VBeamWidth
-	SLAV := s.SLAV
-	tilt := -s.VTiltAngle
+	theta3Db := e.VBeamWidth
+	SLAV := e.SLAV
+	tilt := -e.VDirection
 	val := math.Pow(10, -math.Min(12.0*math.Pow((theta-tilt)/theta3Db, 2), SLAV)/10.0)
 	val = 1
 	return val
 
 }
 
-func (s SettingAAS) ElementEffectiveGain(thetaH, thetaV float64) float64 {
-	hgain, vgain := s.ElementDirectionHGain(thetaH), s.ElementDirectionVGain(thetaV)
-
-	sumgain := hgain * vgain
-	// sumgain = 1.0 / sumgain
-	// sumgain = 1 / (sumgain ^ 2)
-	// ZZ(x, y) = 1 / min(sumgain, 1000)
-
-	result := math.Max(sumgain, vlib.InvDb(-s.SLAV)) * vlib.InvDb(s.GainDb)
-	return result
-}
-
-func (s SettingAAS) ElementDirectionGain(theta float64) float64 {
-	if s.Omni {
-		return 1.0
-	}
+func (e Element) ElementDirectionGain(theta float64) float64 {
 
 	theta3Db := 65.0 * math.Pi / 180.0
 	SLAV := 20.0
-	tilt := -s.VTiltAngle * math.Pi / 180.0
+	tilt := -e.VDirection * math.Pi / 180.0
 
 	return math.Pow(10, -math.Min(12.0*math.Pow((theta-tilt)/theta3Db, 2), SLAV)/10.0)
 }
 
-/// Draws nNodes in a circular fashion centered around 0,0
-func dropCircularNodes(N int, radius float64) vlib.VectorC {
-	result := vlib.NewVectorC(N)
-	delTheta := 2 * math.Pi / float64(N)
-	angle := 0.0
-	for i := 0; i < N; i++ {
-		angle += delTheta
-		jtheta := complex(0.0, angle)
-		result[i] = complex(radius, 0) * cmplx.Exp(-jtheta)
+// ElementGain generates the antenna gain for given theta,phi in degree
+// based on Table 8-6 in Report ITU-R M.2412
+// returns effective Antenna Gain Ag, Horizontal gain az, Elevation Gain el
+func (e Element) ElementGain(thetaH, thetaV float64) (az, el, Ag float64) {
+	phi := Wrap0To180(thetaV)
+	theta := Wrap180To180(thetaH)
+	theta3dB := 65.0 // degree
+	SLAmax := 30.0
+	Am := SLAmax
+	Ah := -math.Min(12.0*math.Pow(theta/theta3dB, 2.0), Am)
+
+	MechTiltGCS := e.VDirection // Pointing to Horizon..axis..
+	Av := -math.Min(12.0*math.Pow((phi-MechTiltGCS)/theta3dB, 2.0), SLAmax)
+	result := -math.Min(-math.Floor(Av+Ah), Am)
+	//result = Ah
+	az = Ah
+	el = Av
+	Ag = result + e.GainDb
+	return az, el, Ag
+}
+
+func (a AAS) ElementGain(thetaH, thetaV float64) (az, el, Ag float64) {
+	az, el, Ag = a.elem.ElementGain(thetaH, thetaV)
+	return az, el, Ag
+}
+
+func (a AAS) GeneratePattern() {
+	fid, _ := os.Create("./results/Antenna_Gain.dat")
+	fmt.Fprintf(fid, "%%Az\t\t\t\tEl\t\t\t\tAh\t\t\t\tAv\t\t\t\tAg\t\t\t\tAa")
+
+	Nh, Nv := a.SizeTxRU.R, a.SizeTxRU.C
+
+	// MaxGaindBi := 8.0
+	// theta3dB := 65.0 // degree
+	// SLAmax := 30.0
+	// Am := SLAmax
+	// MechTiltGCS := 90.0 // Pointing to Horizon..axis..
+	hspace := 0.5
+	vspace := 0.8
+	dtilt := 157.449 // degree      //can be 5pi/8 ,7pi/8 for urban
+	descan := 56.207 //degree       //can be -5pi/16, -3pi/16, -pi/16, 5pi/16, 3pi/16, pi/16 for urban
+	temp := -180.0
+	temp1 := 0.0
+
+	var sum = complex(0.0, 0.0)
+	var theta [182]float64
+	var phi [182]float64
+	// var Ah [182]float64
+	// var Av [182]float64
+	// var Ag [182]float64
+	// var Aa [182]float64
+	var result [182]float64
+	for i := 1; i <= 181; i++ {
+		theta[i] = temp
+		temp = temp + 2
+
 	}
-	return result
-}
 
-/// Drops Linear Vertical Nodes spaced with dh,dv linearly
-func dropLinearNodes(N int, dv, dh float64) vlib.VectorC {
-	result := vlib.NewVectorC(N)
-	var xloc, yloc float64
-	// dv := 10.0
-	// dh:=0.0
-	for i := 0; i < N; i++ {
-		result[i] = complex(xloc, yloc)
-		yloc += dv
-		xloc += dh
-
+	for i := 1; i <= 181; i++ {
+		phi[i] = temp1
+		temp1 = temp1 + 1
 	}
 
-	return result
+	// Create weight vectors for a TXRU
+	{
+		i := 0
+		// var w vlib.VectorC
+		w := mat.NewCDense(Nh, Nv, nil)
+		v := mat.NewCDense(Nh, Nv, nil)
+		 vlib.
+		
+		for m := 1; m < Nh; m++ {
+			for n := 1; n < Nv; n++ {
+				tw := complex(1/math.Pow(float64(Nh*Nv), 1/2), 0) * cmplx.Exp(complex(0, 2*math.Pi*(float64(n-1)*vspace*math.Sin(dtilt*math.Pi/180)-float64(m-1)*hspace*math.Cos(dtilt*math.Pi/180)*math.Sin(descan*math.Pi/180))))
+				tv := cmplx.Exp(complex(0, 2*math.Pi*(float64(n-1)*vspace*math.Cos(phi[i]*math.Pi/180)+float64(m-1)*hspace*math.Sin(phi[i]*math.Pi/180)*math.Sin(theta[i]*math.Pi/180))))
+
+				w.Set(m, n, tw)
+				v.Set(m, n, tv)
+				sum = sum + tw*tv
+			}
+		}
+		fmt.Println(w)
+		fmt.Println(v)
+
+	}
+	return
+
+	// for i := 1; i <= 181; i++ {
+	// 	Ah[i] = -math.Min(12.0*math.Pow(theta[i]/theta3dB, 2.0), Am)
+	// 	Av[i] = -math.Min(12.0*math.Pow((phi[i]-MechTiltGCS)/theta3dB, 2.0), SLAmax)
+	// 	result[i] = -math.Min(-(Av[i] + Ah[i]), Am)
+	// 	Ag[i] = result[i] + MaxGaindBi
+
+	// 	var sum = complex(0.0, 0.0)
+
+	// 	// Generate the weight w and v
+	// 	for m := 1; m < Nh; m++ {
+	// 		for n := 1; n < Nv; n++ {
+	// 			w := complex(1/math.Pow(float64(Nh*Nv), 1/2), 0) * cmplx.Exp(complex(0, 2*math.Pi*(float64(n-1)*vspace*math.Sin(dtilt*math.Pi/180)-float64(m-1)*hspace*math.Cos(dtilt*math.Pi/180)*math.Sin(descan*math.Pi/180))))
+	// 			v := cmplx.Exp(complex(0, 2*math.Pi*(float64(n-1)*vspace*math.Cos(phi[i]*math.Pi/180)+float64(m-1)*hspace*math.Sin(phi[i]*math.Pi/180)*math.Sin(theta[i]*math.Pi/180))))
+	// 			sum = sum + w*v
+
+	// 		}
+
+	// 	}
+
+	// 	Aa[i] = Ag[i] + 10*math.Log10(math.Pow(cmplx.Abs(sum), 2))
+	// 	fmt.Fprintf(fid, "\n  %f \t %f \t %f \t %f \t %f\t %f ", theta[i], phi[i], Ah[i], Av[i], Ag[i], Aa[i])
+	// }
+	_ = result
+	fid.Close()
 }
 
-type ArrayType int
+//
+func GenerateWeightsW(dv float64,elecTilt float64,M int ) vlib.VectorC {
+ w:= vlib.NewVectorC(M)
+ wm:=zvec.MakeSlice(M)
+ elecTiltRad:=vlib.ToRadian(elecTilt)
+ KK:=1.0/math.Sqrt(M)
+ for m := 0; m < M; m++ {
+	 vv:=complex(-2*math.PI)
+		cmplx.Exp(2.0*(math.Phi/lamda)*(m-1)*dv*math.Cos(elecTiltRad) )
+	 wm[m]=math.Exp(vv)
+ }
 
-var ArrayTypes = [...]string{
-	"LinearPhaseArray",
-	"CircularPhaseArray",
+
 }
-
-func (c ArrayType) String() string {
-	return ArrayTypes[c]
-}
-
-const (
-	LinearPhaseArray = iota
-	CircularPhaseArray
-)
