@@ -253,6 +253,7 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 	systemFrequencyGHz := w.FrequencyGHz
 
 	N0 := NoisePSDdBm - 30 + vlib.Db(BandwidthMHz*1e6)
+
 	// fmt.Println("Noise Power is ", NoisePSDdBm, "After Bandwidth ",BandwidthMHz, N0)
 	var link LinkMetric
 	rxnode := singlecell.Nodes[rxid]
@@ -281,6 +282,7 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 		link.TxNodeIDs.Resize(0)
 		nlinks := 0
 
+		var umarsrp = make(map[int]*vlib.VectorF)
 		for _, val := range alltxNodeIds {
 			txnodeID := val
 			txnode := singlecell.Nodes[val]
@@ -289,7 +291,6 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 
 				nlinks++
 				link.TxNodeIDs.AppendAtEnd(txnodeID)
-
 				ant := afn(txnodeID)
 				ant.Centre = txnode.Location
 				ant.FreqHz = systemFrequencyGHz * 1.0e9
@@ -338,10 +339,11 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 				}
 
 				if txnode.Active {
+					// fmt.Println("Txnode Location: ", txnode.Location, "Rxnode Location: ", rxnode.Location)
 					d3d, az, el := vlib.RelativeGeo(txnode.Location, rxnode.Location)
 					antennaHBeamMax := 0.0
 					el = -el + 90.0
-					GCSaz := az + (txnode.Direction - antennaHBeamMax)
+					GCSaz := az - (txnode.Direction - antennaHBeamMax)
 					GCSel := el - txnode.VTilt
 
 					var Az, El, aasgainDB float64
@@ -349,10 +351,30 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 						Az, El, aasgainDB = antenna.BSPatternIndoorHS_Db(GCSaz, GCSel)
 					} else {
 						Az, El, aasgainDB = antenna.BSPatternDb(GCSaz, GCSel)
+						// aasgainDB = aasgainDB + antenna.UEPatternOmniDb(GCSaz, GCSel)
 					}
+					aas := 0.0
 
+					if model.Env() == "UMa" {
+						_, _, aasUMa, interferenceuma, _ := antenna.AnalogBeamDb(GCSaz, GCSel, 4, 8)
+						umarsrp[txnodeID] = new(vlib.VectorF)
+						for i := 0; i < interferenceuma.Len(); i++ {
+							rxRSRP = interferenceuma[i] + txnode.TxPowerDBm - 30 - lossDb - otherLossDb
+							umarsrp[txnodeID].AppendAtEnd(rxRSRP)
+						}
+						rxRSRP = aasUMa + txnode.TxPowerDBm - 30 - lossDb - otherLossDb
+						link.TxNodesRSRP.AppendAtEnd(rxRSRP)
+
+						aasgainDB = aasUMa
+					} else {
+						_, _, aas, _, _ = antenna.CombPatternDb(GCSaz, GCSel, aasgainDB, txnode.VTilt, 8, 1)
+						// _, _, aas, _, _ = antenna.CombPatternDb(GCSaz, GCSel, aasgainDB, txnode.Direction, 1, 1)
+						// aas = aasgainDB
+						aasgainDB = aas
+						rxRSRP = aas + txnode.TxPowerDBm - 30 - lossDb - otherLossDb
+						link.TxNodesRSRP.AppendAtEnd(rxRSRP)
+					}
 					//	_, _, Aagain, result, Ag := antenna.CombPatternDb(Az, El, aasgainDB, 10, 4)
-
 					// HGAINmaxDBis := 8.0 //
 					_ = d3d
 					//fmt.Printf("\n%d:%d (az,el)=[%v %v] distance=%v, SectorOrientation: %v, true AZ=(%v) EL(%v)%vdB ", txnodeID, rxid, az, el, d3d, txnode.Direction, GCSaz, GCSel, aasgainDB-8.0)
@@ -365,19 +387,19 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 					// // aasgainDB = aasgain2
 					//Again = aasgainDB
 
-					rxRSRP = aasgainDB + txnode.TxPowerDBm - 30 - lossDb - otherLossDb
+					// rxRSRP = aas + txnode.TxPowerDBm - 30 - lossDb - otherLossDb //- vlib.Db(2*24*12)
 					_ = Az
 					_ = El
 					if LOG {
 						fmt.Fprintf(fid, "\n %d \t %d \t %5.2f \t %f \t %t \t %f \t %f \t %f \t %f \t %f \t %f \t %f \t %f \t %f \t %f ", rxid, txnodeID, d3d, rxnode.Location.Z, islos, rxRSRP, lossDb, inloss, extraloss, txnode.TxPowerDBm, aasgainDB, Az, GCSaz, El, GCSel)
 					}
 
-					rxdebugnode = true
-					if rxdebugnode && rxRSRP > -90 {
+					rxdebugnode = false
+					if rxdebugnode {
 						_ = dist
-						// fmt.Printf("\r EVAL2 Rx-Tx (LOS:%v) %d-%d rxRSRP =%v,Power=%f,AAS =%f ,PL = %f, otherLoss=%f , dist =%v, d2In: =%v", islos, rxid, txnodeID, rxRSRP, txnode.TxPowerDBm, aasgainDB, lossDb, otherLossDb, dist, d2In)
+						fmt.Printf("\r EVAL2 Rx-Tx (LOS:%v) %d-%d rxRSRP =%v,Power=%f,AAS =%f ,PL = %f, otherLoss=%f , dist =%v, d2In: =%v", islos, rxid, txnodeID, rxRSRP, txnode.TxPowerDBm, aasgainDB, lossDb, otherLossDb, dist, d2In)
 						if rxnode.Indoor || rxnode.InCar {
-							//	fmt.Println("\n Found in Indoor ", d2In, inloss, extraloss)
+							fmt.Println("\n Found in Indoor ", d2In, inloss, extraloss)
 						}
 
 					}
@@ -387,7 +409,7 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 					log.Panicln("============= %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% %")
 				}
 
-				link.TxNodesRSRP.AppendAtEnd(rxRSRP)
+				// link.TxNodesRSRP.AppendAtEnd(rxRSRP)
 
 			} else {
 				log.Printf("%s[%d] : TxNode %d : No Link on %3.2fGHz", rxnode.Type, rxid, val, systemFrequencyGHz)
@@ -404,11 +426,12 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 			rsrpLinr := vlib.InvDbF(link.TxNodesRSRP)
 			totalrssi := vlib.Sum(rsrpLinr) + vlib.InvDb(link.N0)
 			maxrsrp := vlib.Max(rsrpLinr)
-			//fmt.Println("\n  vlib.Sum(rsrpLinr), vlib.InvDb(link.N0) ", vlib.Db(vlib.Sum(rsrpLinr)), (link.N0))
-			// if nlinks == 1 {
-			// 	link.BestSINR = vlib.Db(maxrsrp) - N0
-			// 	// +1000 /// s/i = MAX value
-			// } else {
+			sortedRxrp, indx := link.TxNodesRSRP.Sorted2()
+			link.TxNodeIDs = link.TxNodeIDs.At(indx.Flip()...) // Sort it
+			link.TxNodesRSRP = sortedRxrp.Flip()
+			link.BestRSRP = link.TxNodesRSRP[0]
+			link.BestRSRPNode = link.TxNodeIDs[0]
+			link.RSSI = vlib.Db(totalrssi)
 			if totalrssi == maxrsrp {
 				link.BestSINR = vlib.Db(maxrsrp)
 				if link.BestSINR > 200 {
@@ -416,18 +439,26 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 				}
 
 			} else {
-				link.BestSINR = vlib.Db(maxrsrp) - vlib.Db(totalrssi-maxrsrp)
+				// nodeRSRP, _ := vlib.Sorted(link.TxNodesRSRP)
+				rssi := 0.0
+				if model.Env() == "UMa" {
+					interference := 0
+					for i := 1; i < (nlinks - 1); i++ {
+						umarsrpLinr := vlib.InvDbF(*umarsrp[link.TxNodeIDs[i]])
+						interference = rand.Intn(umarsrpLinr.Len())
+						rssi = rssi + umarsrpLinr[interference]
+					}
+					rssi = rssi + vlib.InvDb(link.N0)
+					link.BestSINR = vlib.Db(maxrsrp) - vlib.Db(rssi)
+					link.RSSI = vlib.Db(rssi)
+				} else {
+					link.BestSINR = vlib.Db(maxrsrp) - vlib.Db(totalrssi-maxrsrp)
+				}
+				//link.AgainDb = Again
+
 			}
-			link.RSSI = vlib.Db(totalrssi)
-			sortedRxrp, indx := link.TxNodesRSRP.Sorted2()
-			link.TxNodeIDs = link.TxNodeIDs.At(indx.Flip()...) // Sort it
-			link.TxNodesRSRP = sortedRxrp.Flip()
-			link.BestRSRP = link.TxNodesRSRP[0]
-			link.BestRSRPNode = link.TxNodeIDs[0]
-			//link.AgainDb = Again
 
 		}
-
 	}
 
 	return link

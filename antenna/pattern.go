@@ -87,19 +87,19 @@ func BSPatternDb(theta, phi float64) (az, el, Ag float64) {
 }
 
 //CombPatternDb calculates combine antenna pattern gain
-func CombPatternDb(theta, phi, Ag float64, Nv, Nh int) (az, el, Aa, result, old float64) {
+func CombPatternDb(theta, phi, Ag, dtilt float64, Nv, Nh int) (az, el, Aa, result, old float64) {
 	phi = Wrap0To180(phi)
 	theta = Wrap180To180(theta)
 	hspace := 0.5
 	vspace := 0.8
-	dtilt := 100.0  // degree
-	descan := 120.0 //degree
+	dtilt = 100   // degree
+	descan := 0.0 //degree
 	var sum = complex(0.0, 0.0)
 
 	for m := 0; m < Nh; m++ {
 		for n := 0; n < Nv; n++ {
-			w := complex(1/math.Pow(float64(Nh*Nv), 1/2), 0) * cmplx.Exp(complex(0, 2*math.Pi*(float64(n)*vspace*math.Sin(dtilt*math.Pi/180)-float64(m)*hspace*math.Cos(dtilt*math.Pi/180)*math.Sin(descan*math.Pi/180))))
-			v := cmplx.Exp(complex(0, 2*math.Pi*(float64(n)*vspace*math.Cos(phi*math.Pi/180)+float64(m)*hspace*math.Sin(phi*math.Pi/180)*math.Sin(theta*math.Pi/180))))
+			w := complex(1/math.Pow(float64(Nh*Nv), 1/2), 0) * cmplx.Exp(complex(0, 2*math.Pi*(float64(n)*vspace*math.Sin((math.Pi/180)*dtilt)-float64(m)*hspace*math.Cos((math.Pi/180)*dtilt)*math.Sin((math.Pi/180)*descan))))
+			v := cmplx.Exp(complex(0, 2*math.Pi*(float64(n)*vspace*math.Cos((math.Pi/180)*phi)+float64(m)*hspace*math.Sin((math.Pi/180)*phi)*math.Sin((math.Pi/180)*theta))))
 			sum = sum + w*v
 		}
 	}
@@ -112,37 +112,48 @@ func CombPatternDb(theta, phi, Ag float64, Nv, Nh int) (az, el, Aa, result, old 
 }
 
 //Analogy Beamforming antenna array gain
-func AnalogBeamDb(theta, phi float64, nv, nh int) (az, el, Aa, result, old float64) {
+func AnalogBeamDb(theta, phi float64, nv, nh int) (az, el, Aa float64, result vlib.VectorF, old float64) {
 	pi := math.Pi
 	azimuth := vlib.VectorF{-5 * pi / 16, -3 * pi / 16, -pi / 16, pi / 16, 3 * pi / 16, 5 * pi / 16}
 	azimuth = azimuth.Scale(180 / pi)
 	zenith := vlib.VectorF{5 * pi / 8, 7 * pi / 8}
 	zenith = zenith.Scale(180 / pi)
-	az, el, aasgain := BSPatternDb(theta, phi)
-	reaz := azimuth.Sub(az)
-	aasgainDB := vlib.NewVectorF(12)
-	for j := 0; j < reaz.Len(); j++ {
+	phi = Wrap0To180(phi)
+	// theta = Wrap180To180(theta)
+	reaz := azimuth.Sub(-theta)
+	aasgainDB := vlib.NewVectorF(0)
+	// fmt.Println("Start")
+	// _, _, aasgain := BSPatternDb(theta, phi)
+	for j := 0; j < azimuth.Len(); j++ {
 		for i := 0; i < zenith.Len(); i++ {
-			_, _, aas, _, _ := UMaCombPatternDb(reaz[j], zenith[i], el, aasgain, 4, 8)
+			reel := phi - (zenith[i])
+
+			_, _, aasgain := BSPatternDb(reaz[j], reel)
+			// aasgain = 0.0
+			// _, _, aas, _, _ := UMaCombPatternDb(reaz[j], azimuth[j], zenith[i], reel, aasgain, 4, 8)
+			_, _, aas, _, _ := UMaCombPatternDb(azimuth[j], azimuth[j], zenith[i], zenith[i], aasgain, 4, 8)
+			// fmt.Println("azimuth: ", reaz[j], "zenith: ", reel, "aas: ", aas, "aasgainDb: ", aasgain, "composite aas: ", aas-aasgain)
 			aasgainDB.AppendAtEnd(aas)
 		}
 	}
-	aas := aasgainDB.Sorted()
-	return theta, phi, aas[0], 0, aasgain
+	// fmt.Println("End")
+	aas := vlib.Max(aasgainDB)
+	return theta, phi, aas, aasgainDB, 0
 }
 
 //CombPatternDb calculates combine antenna pattern gain
-func UMaCombPatternDb(theta, zenith, phi, Ag float64, Nv, Nh int) (az, el, Aa, result, old float64) {
+func UMaCombPatternDb(theta, descan, zenith, phi, Ag float64, Nv, Nh int) (az, el, Aa, result, old float64) {
 	hspace := 0.5
 	vspace := 0.8
-	dtilt := zenith // degree
-	descan := 22.5  //degree
+	phi = Wrap0To180(phi)
+	theta = Wrap180To180(theta)
+	// dtilt := zenith // degree
 	var sum = complex(0.0, 0.0)
 
 	for m := 0; m < Nh; m++ {
 		for n := 0; n < Nv; n++ {
-			w := complex(1/math.Pow(float64(Nh*Nv), 1/2), 0) * cmplx.Exp(complex(0, 2*math.Pi*(float64(n)*vspace*math.Sin(dtilt*math.Pi/180)-float64(m)*hspace*math.Cos(dtilt*math.Pi/180)*math.Sin(descan*math.Pi/180))))
-			v := cmplx.Exp(complex(0, 2*math.Pi*(float64(n)*vspace*math.Cos(phi*math.Pi/180)+float64(m)*hspace*math.Sin(phi*math.Pi/180)*math.Sin(theta*math.Pi/180))))
+			w := complex(1/math.Pow(float64(Nv), 1/2), 0) * cmplx.Exp(complex(0, -1*2*math.Pi*(float64(n)*vspace*math.Cos((math.Pi/180)*phi))))
+			v := complex(1/math.Pow(float64(Nh), 1/2), 0) * cmplx.Exp(complex(0, -1*2*math.Pi*(float64(m)*hspace*math.Sin((math.Pi/180)*phi)*math.Sin((math.Pi/180)*theta))))
 			sum = sum + w*v
 		}
 	}
@@ -163,14 +174,14 @@ func BSPatternIndoorHS_Db(theta, phi float64) (az, el, Ag float64) {
 	theta3dB := 90.0
 	SLAmax := 25.0
 	Am := 25.0
-	MechTiltGCS := 180.0 /// Need to be set to 180.. pointing to Ground, when Antenna mounted on ceiling..
+	MechTiltGCS := 110.0 /// Need to be set to 180.. pointing to Ground, when Antenna mounted on ceiling..
 
 	Ah := -math.Min(12.0*math.Pow(theta/theta3dB, 2.0), Am)
 	Av := -math.Min(12.0*math.Pow((phi-MechTiltGCS)/theta3dB, 2.0), SLAmax)
 	result := -math.Min(-math.Floor(Av+Ah), Am) + MaxGaindBi
 
-	az = theta
-	el = phi
+	az = Ah
+	el = Av
 	Ag = result
 	return az, el, Ag
 
@@ -178,7 +189,7 @@ func BSPatternIndoorHS_Db(theta, phi float64) (az, el, Ag float64) {
 
 // UEPatternDb generates the antenna gain for given theta,phi
 // based OMNI Directional gain..
-func UEPatternOmniDb(theta, phi, gain float64) float64 {
+func UEPatternOmniDb(theta, phi float64) float64 {
 	phi = Wrap0To180(phi)
 	theta = Wrap180To180(theta)
 	MaxGaindBi := 0.0 //    0 for ue and 8 for bs
@@ -189,7 +200,7 @@ func UEPatternOmniDb(theta, phi, gain float64) float64 {
 	//Ah := -math.Min(12.0*math.Pow(theta/theta3dB, 2.0), Am)
 
 	MechTiltGCS := 90.0 // Pointing to Horizon..axis..
-	Av := -math.Min(12.0*math.Pow((phi-MechTiltGCS)/theta3dB, 2.0), SLAmax)
+	Av := -math.Min(12.0*math.Pow((180-phi-MechTiltGCS)/theta3dB, 2.0), SLAmax)
 
 	result := -math.Min(-math.Floor(Av+Ah), Am)
 	//result = Ah

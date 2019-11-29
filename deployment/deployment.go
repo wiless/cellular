@@ -682,11 +682,11 @@ func ForceMinDistance(in vlib.VectorC, d, hexradius float64) vlib.VectorC {
 	if d == 0 {
 		return in
 	}
-	log.Println("I am being called")
+	// log.Println("I am being called")
 	dist := in.Abs()
 	indx := dist.FindLess(d)
 	if indx.Size() > 0 {
-		log.Printf("Found .. %d items of %d < MinDistance %f ", indx.Size(), in.Size(), d)
+		// log.Printf("Found .. %d items of %d < MinDistance %f ", indx.Size(), in.Size(), d)
 		newpos := HexRandPoints(indx.Size(), hexradius)
 
 		for i, pos := range newpos {
