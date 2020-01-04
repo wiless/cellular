@@ -361,7 +361,7 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 					}
 					// config.PrintStructsPretty(aasBeamgainDB)
 					aasgainDB = aasBeamgainDB[bestBeamID][0][0] // Picking gain from TxRU o,o assuming all TxRUs have same gain/ all beams
-					rxRSRP = -lossDb - otherLossDb + txnode.TxPowerDBm
+					rxRSRP = aasgainDB - lossDb - otherLossDb + txnode.TxPowerDBm
 					link.TxNodesRSRP.AppendAtEnd(rxRSRP)
 
 					//	_, _, Aagain, result, Ag := antenna.CombPatternDb(Az, El, aasgainDB, 10, 4)
