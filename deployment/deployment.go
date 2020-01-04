@@ -580,8 +580,10 @@ func (d *DropSystem) SetAllNodeLocation(ntype string, locations vlib.VectorC) {
 	}
 
 	for indx, val := range notype.NodeIDs {
+
 		node := d.Nodes[val]
-		node.Location.SetXY(real(locations[indx]), imag(locations[indx]))
+		// node.Location.SetXY(real(locations[indx]), imag(locations[indx]))
+		node.Location.SetXYZ(real(locations[indx]), imag(locations[indx]), 1.5)
 		d.Nodes[val] = node
 
 	}

@@ -29,6 +29,53 @@ var Bobwriter io.Writer
 
 // var VBeamWidth, HBeamWidth float64 = 65, 65
 
+// type SettingAAS struct {
+// 	UID                              string `datastore:"-" json:"uid"`
+// 	NodeID                           int    // Associated Node ID where relevant
+// 	elementLocations                 []vlib.Location3D
+// 	lamda                            float64
+// 	FreqHz                           float64
+// 	hColumns                         float64 // To be exported later
+// 	N                                int
+// 	Nodes                            int
+// 	Omni                             bool
+// 	MfileName                        string
+// 	VTiltAngle                       float64
+// 	HTiltAngle                       float64
+// 	BeamTilt                         float64
+// 	DisableBeamTit                   bool
+// 	HoldOn                           bool
+// 	VBeamWidth, HBeamWidth           float64
+// 	SLAV                             float64
+// 	ESpacingVFactor, ESpacingHFactor float64
+// 	Centre                           vlib.Location3D
+// 	weightVector                     vlib.VectorC
+// 	AASArrayType                     ArrayType
+// 	CurveWidthInDegree               float64
+// 	CurveRadius                      float64
+// 	GainDb                           float64
+// }
+
+// func (s *SettingAAS) SetDefault() {
+// 	s.FreqHz = 2.0e9
+// 	s.N = 1
+// 	s.Nodes = 360
+// 	s.Omni = false
+// 	s.MfileName = "output.m"
+// 	s.VTiltAngle = 14
+// 	s.HTiltAngle = 0
+// 	s.HBeamWidth = 65
+// 	s.VBeamWidth = 65
+// 	s.SLAV = 30.0
+// 	s.lamda = cspeed / freq
+// 	s.ESpacingHFactor = 0 /// Factor mulplied by params.lamda
+// 	s.ESpacingVFactor = .5
+// 	s.AASArrayType = LinearPhaseArray
+// 	s.CurveRadius = 0
+// 	s.CurveWidthInDegree = 0
+// 	s.GainDb = 0
+// }
+
 type SettingAAS struct {
 	UID                              string `datastore:"-" json:"uid"`
 	NodeID                           int    // Associated Node ID where relevant
@@ -41,6 +88,8 @@ type SettingAAS struct {
 	Omni                             bool
 	MfileName                        string
 	VTiltAngle                       float64
+	ElectronicTilt                   []float64
+	Dscan                            []float64
 	HTiltAngle                       float64
 	BeamTilt                         float64
 	DisableBeamTit                   bool
@@ -54,6 +103,7 @@ type SettingAAS struct {
 	CurveWidthInDegree               float64
 	CurveRadius                      float64
 	GainDb                           float64
+	BSAntennaConfig                  []int
 }
 
 func (s *SettingAAS) SetDefault() {
@@ -62,8 +112,11 @@ func (s *SettingAAS) SetDefault() {
 	s.Nodes = 360
 	s.Omni = false
 	s.MfileName = "output.m"
-	s.VTiltAngle = 14
+	s.VTiltAngle = 0
+	s.ElectronicTilt = []float64{14}
 	s.HTiltAngle = 0
+	s.Dscan = []float64{0}
+	s.BeamTilt = 90
 	s.HBeamWidth = 65
 	s.VBeamWidth = 65
 	s.SLAV = 30.0
@@ -74,6 +127,7 @@ func (s *SettingAAS) SetDefault() {
 	s.CurveRadius = 0
 	s.CurveWidthInDegree = 0
 	s.GainDb = 0
+	s.BSAntennaConfig = []int{8, 8, 2, 1, 1, 2, 1}
 }
 
 func NewAAS() *SettingAAS {
