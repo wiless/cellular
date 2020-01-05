@@ -67,6 +67,7 @@ func Wrap180To180(degree float64) float64 {
 // BSPatternDb generates the antenna gain for given theta,phi in degree
 // based on Table 8-6 in Report ITU-R M.2412
 // returns effective Antenna Gain Ag, Horizontal gain az, Elevation Gain el
+
 func BSPatternDb(theta, phi float64) (az, el, Ag float64) {
 	phi = Wrap0To180(phi)
 	theta = Wrap180To180(theta)
@@ -86,13 +87,32 @@ func BSPatternDb(theta, phi float64) (az, el, Ag float64) {
 	return az, el, Ag
 }
 
+func ElementGainDb(theta, phi float64, ant SettingAAS) (az, el, Ag float64) {
+	phi = Wrap0To180(phi)
+	theta = Wrap180To180(theta)
+	MaxGaindBi := ant.GainDb   //    0 for ue and 8 for bs
+	theta3dB := ant.HBeamWidth // degree
+	phi3dB := ant.VBeamWidth
+	SLAmax := ant.SLAV
+	Am := SLAmax
+	Ah := -math.Min(12.0*math.Pow(theta/theta3dB, 2.0), Am)
+	MechTiltGCS := ant.BeamTilt // Pointing to Horizon..axis..
+	Av := -math.Min(12.0*math.Pow((phi-MechTiltGCS)/phi3dB, 2.0), SLAmax)
+	result := -math.Min(-math.Floor(Av+Ah), Am)
+	//result = Ah
+	az = Ah
+	el = Av
+	Ag = result + MaxGaindBi
+	return az, el, Ag
+}
+
 //CombPatternDb calculates returns all the beam gain for each TxRU
 func CombPatternDb(theta, phi float64, ant SettingAAS) (aag map[int]vlib.MatrixF, bestBeamID int, Az, El float64) {
 
 	theta = Wrap180To180(theta)
 	phi = Wrap0To180(phi)
 	var ag float64
-	Az, El, ag = BSPatternDb(theta, phi)
+	Az, El, ag = ElementGainDb(theta, phi, ant)
 	// fmt.Println("Antenna Element Gain:", ag)
 	hspace := ant.ESpacingHFactor
 	vspace := ant.ESpacingVFactor
@@ -355,3 +375,4 @@ func UEPatternDb(theta, phi float64) (az, el, Ag float64) {
 	Ag = result
 	return az, el, Ag
 }
+
