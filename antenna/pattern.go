@@ -142,6 +142,57 @@ func CombPatternDb(theta, phi float64, ant SettingAAS) (aag map[int]vlib.MatrixF
 	return aag, bestBeamID, Az, El
 }
 
+// func DFTCombPatternDb(theta, phi float64, ant SettingAAS) (aag map[int]vlib.MatrixF, bestBeamID int, Az, El float64) {
+
+// 	theta = Wrap180To180(theta)
+// 	phi = Wrap0To180(phi)
+// 	var ag float64
+// 	Az, El, ag = BSPatternDb(theta, phi)
+// 	// fmt.Println("Antenna Element Gain:", ag)
+// 	hspace := ant.ESpacingHFactor
+// 	vspace := ant.ESpacingVFactor
+// 	dtilt := ant.ElectronicTilt // degree
+// 	descan := ant.Dscan         //degree
+// 	// var maxgain float64 // Maximum BeamGain out of the Beam Set
+// 	var sum = complex(0.0, 0.0)
+// 	nv := ant.BSAntennaConfig[0] / ant.BSAntennaConfig[5]
+// 	nh := ant.BSAntennaConfig[1] / ant.BSAntennaConfig[6]
+// 	var maxgain float64
+// 	bestBeamID = 0
+// 	// var aag map[int]vlib.MatrixF
+// 	nbeams := len(ant.Dscan) * len(ant.ElectronicTilt)
+// 	aag = make(map[int]vlib.MatrixF, nbeams)
+// 	/////
+// 	c := 1.0 / float64(nv*nh)
+// 	for i := 0; i < len(dtilt); i++ { //  dtilt is a vector of Zenith Angles of the Beam Set
+// 		for j := 0; j < len(descan); j++ { // descan is a vector of Azimuth Angles of the Beam Set
+// 			beamid := j + len(descan)*i
+// 			for m := 1; m <= nv; m++ {
+// 				for n := 1; n <= nh; n++ {
+// 					w := complex(1/math.Pow(float64(nv), 1/2), 0) * cmplx.Exp(complex(0, -1*2*math.Pi*(float64(n-1)*vspace*math.Cos((math.Pi/180)*(dtilt[i]-phi)))))
+// 					v := complex(1/math.Pow(float64(nh), 1/2), 0) * cmplx.Exp(complex(0, -1*2*math.Pi*(float64(m-1)*hspace*math.Sin((math.Pi/180)*(dtilt[i]-phi))*math.Sin((math.Pi/180)*(descan[j]-theta)))))
+// 					sum = sum + w*v
+// 				}
+// 			}
+// 			/////////////
+// 			txRUGains := vlib.NewMatrixF(ant.BSAntennaConfig[5], ant.BSAntennaConfig[6])
+// 			for k := 0; k < ant.BSAntennaConfig[5]; k++ {
+// 				for l := 0; l < ant.BSAntennaConfig[6]; l++ {
+// 					txRUGains[k][l] = 10*math.Log10(c*math.Pow(cmplx.Abs(sum), 2)) + ag // Composite Beam Gain + Antenna Element Gain
+// 					temp := txRUGains[k][l]
+// 					if maxgain < temp {
+// 						maxgain = temp
+// 						bestBeamID = beamid
+// 					}
+// 				}
+// 			}
+// 			aag[beamid] = txRUGains
+// 			//////////
+// 		}
+// 	}
+// 	return aag, bestBeamID, Az, El
+// }
+
 // func txBeamGain(ant SettingAAS, dtilt, descan float64, nv, nh int) (sum float64) {
 // 	c := 1.0 / float64(nv*nh)
 // 	for i := 0; i < len(dtilt); i++ { //  dtilt is a vector of Zenith Angles of the Beam Set

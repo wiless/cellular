@@ -30,6 +30,7 @@ type LinkMetric struct {
 	BestSINR     float64
 	RoIDbm       float64
 	//AgainDb      float64
+	BestCouplingLoss float64
 }
 
 func (l *LinkMetric) SetParams(fGHz, bwMHz float64) {

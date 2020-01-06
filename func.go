@@ -250,12 +250,9 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 	BandwidthMHz := w.BandwidthMHz
 	NoisePSDdBm := w.NoisePSDdBm
 	systemFrequencyGHz := w.FrequencyGHz
-
-	N0 := NoisePSDdBm + vlib.Db(BandwidthMHz*1e6)
-
-	// fmt.Println("Noise Power is ", NoisePSDdBm, "After Bandwidth ",BandwidthMHz, N0)
-	var link LinkMetric
 	rxnode := singlecell.Nodes[rxid]
+	N0 := NoisePSDdBm + vlib.Db(BandwidthMHz*1e6) + rxnode.RxNoiseFigureDbm
+	var link LinkMetric
 
 	txnodeTypes := singlecell.GetTxNodeNames()
 
@@ -336,7 +333,6 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 				}
 
 				if txnode.Active {
-					// fmt.Println("Txnode Location: ", txnode.Location, "Rxnode Location: ", rxnode.Location)
 					d3d, az, el := vlib.RelativeGeo(txnode.Location, rxnode.Location)
 					antennaHBeamMax := 0.0
 					el = -el + 90.0
@@ -348,22 +344,15 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 						beamrsrp[txnodeID] = new(vlib.VectorF)
 					}
 
-					// if model.Env() == "InH" {
-					// 	// Az, El, ag = antenna.BSPatternIndoorHS_Db(GCSaz, GCSel)
-					// } else {
-					// 	Az, El, ag = antenna.BSPatternDb(GCSaz, GCSel)
-					// }
-
 					aasBeamgainDB, bestBeamID, _, _ := antenna.CombPatternDb(GCSaz, GCSel, ant)
 					for _, val := range aasBeamgainDB {
 						tempRSRP := val[0][0] - lossDb - otherLossDb + txnode.TxPowerDBm
 						beamrsrp[txnodeID].AppendAtEnd(tempRSRP)
 					}
-					// config.PrintStructsPretty(aasBeamgainDB)
+
 					aasgainDB = aasBeamgainDB[bestBeamID][0][0] // Picking gain from TxRU o,o assuming all TxRUs have same gain/ all beams
 					rxRSRP = aasgainDB - lossDb - otherLossDb + txnode.TxPowerDBm
 					link.TxNodesRSRP.AppendAtEnd(rxRSRP)
-
 					//	_, _, Aagain, result, Ag := antenna.CombPatternDb(Az, El, aasgainDB, 10, 4)
 					// HGAINmaxDBis := 8.0 //
 					//fmt.Printf("\n%d:%d (az,el)=[%v %v] distance=%v, SectorOrientation: %v, true AZ=(%v) EL(%v)%vdB ", txnodeID, rxid, az, el, d3d, txnode.Direction, GCSaz, GCSel, aasgainDB-8.0)
@@ -414,7 +403,10 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 			link.TxNodeIDs = link.TxNodeIDs.At(indx.Flip()...) // Sort it
 			link.TxNodesRSRP = sortedRxrp.Flip()
 			link.BestRSRP = link.TxNodesRSRP[0]
+
 			link.BestRSRPNode = link.TxNodeIDs[0]
+			link.BestCouplingLoss = link.BestRSRP - singlecell.Nodes[link.BestRSRPNode].TxPowerDBm
+
 			// link.RSSI = vlib.Db(totalrssi)
 			if totalrssi == maxrsrp {
 				link.BestSINR = vlib.Db(maxrsrp)
@@ -445,3 +437,8 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 
 	return link
 }
+
+// func (link *LinkMetric) uplinkSINREval() (snr, sinr, sinrparam) {
+
+// 	return snr, sinr, sinrparam
+// }

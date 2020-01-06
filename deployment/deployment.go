@@ -35,7 +35,7 @@ type Node struct {
 	Mode             TxRxMode `json:"TxRxMode"`
 	alias            int
 	Active           bool
-	RxNoiseFigureDbm float64 // NoiseFigure of the
+	RxNoiseFigureDbm float64 // NoiseFigure of the receiver
 }
 
 func (n Node) Alias() int {
@@ -582,8 +582,7 @@ func (d *DropSystem) SetAllNodeLocation(ntype string, locations vlib.VectorC) {
 	for indx, val := range notype.NodeIDs {
 
 		node := d.Nodes[val]
-		// node.Location.SetXY(real(locations[indx]), imag(locations[indx]))
-		node.Location.SetXYZ(real(locations[indx]), imag(locations[indx]), 1.5)
+		node.Location.SetXY(real(locations[indx]), imag(locations[indx]))
 		d.Nodes[val] = node
 
 	}
