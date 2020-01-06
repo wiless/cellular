@@ -30,12 +30,13 @@ type LinkMetric struct {
 	BestSINR     float64
 	RoIDbm       float64
 	//AgainDb      float64
+	BestCouplingLoss float64
 }
 
 func (l *LinkMetric) SetParams(fGHz, bwMHz float64) {
 	// BandwidthMHz := 20.0
 	NoisePSDdBmPerHz := -173.9
-	l.N0 = NoisePSDdBmPerHz - 30 + vlib.Db(bwMHz*1e6)
+	l.N0 = NoisePSDdBmPerHz + vlib.Db(bwMHz*1e6)
 	l.FreqInGHz = fGHz
 
 }
