@@ -246,7 +246,6 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 		LOG = false
 	}
 	// var fid *os.File
-
 	BandwidthMHz := w.BandwidthMHz
 	NoisePSDdBm := w.NoisePSDdBm
 	systemFrequencyGHz := w.FrequencyGHz
@@ -282,7 +281,6 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 		for _, val := range alltxNodeIds {
 			txnodeID := val
 			txnode := singlecell.Nodes[val]
-
 			if found := txnode.FreqGHz.Contains(systemFrequencyGHz); found {
 
 				nlinks++
@@ -345,13 +343,20 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 					}
 
 					aasBeamgainDB, bestBeamID, _, _ := antenna.CombPatternDb(GCSaz, GCSel, ant)
-					for _, val := range aasBeamgainDB {
+					for id, val := range aasBeamgainDB {
 						tempRSRP := val[0][0] - lossDb - otherLossDb + txnode.TxPowerDBm
+						if val[0][0] > link.MaxAg[0] {
+							link.MaxAg[0] = val[0][0]
+							link.MaxTransmitBeamID = id
+						}
 						beamrsrp[txnodeID].AppendAtEnd(tempRSRP)
 					}
 
 					aasgainDB = aasBeamgainDB[bestBeamID][0][0] // Picking gain from TxRU o,o assuming all TxRUs have same gain/ all beams
 					rxRSRP = aasgainDB - lossDb - otherLossDb + txnode.TxPowerDBm
+					if rxRSRP > vlib.Max(link.TxNodesRSRP) {
+						link.AssoAg[0] = aasgainDB
+					}
 					link.TxNodesRSRP.AppendAtEnd(rxRSRP)
 					//	_, _, Aagain, result, Ag := antenna.CombPatternDb(Az, El, aasgainDB, 10, 4)
 					// HGAINmaxDBis := 8.0 //
@@ -394,7 +399,7 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 		/// Do the statistics here
 		if nlinks > 0 {
 			link.N0 = N0
-
+			// fmt.Println("BeamId:", link.MaxTransmitBeamID, "Antenna Gain: ", link.MaxAg[0])
 			link.BandwidthMHz = BandwidthMHz
 			rsrpLinr := vlib.InvDbF(link.TxNodesRSRP)
 			totalrssi := vlib.Sum(rsrpLinr) + vlib.InvDb(link.N0)
