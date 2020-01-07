@@ -265,7 +265,8 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 	}
 
 	if rxnode.FreqGHz.Contains(systemFrequencyGHz) {
-
+		link.MaxAg = -1000.0
+		link.AssoAg = -1000.0
 		link.FreqInGHz = systemFrequencyGHz
 		link.RxNodeID = rxid
 		link.BestRSRP = -1000
@@ -332,21 +333,29 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 
 				if txnode.Active {
 					d3d, az, el := vlib.RelativeGeo(txnode.Location, rxnode.Location)
-					antennaHBeamMax := 0.0
 					el = -el + 90.0
-					GCSaz := az - (txnode.Direction - antennaHBeamMax)
+					GCSaz := az - txnode.Direction
+					if GCSaz > 180 {
+						GCSaz = -360 + GCSaz
+					}
+					if GCSaz < -180 {
+						GCSaz = 360 + GCSaz
+					}
+					if math.Abs(GCSaz) > 180 {
+						fmt.Println("Error in Orientation", GCSaz)
+					}
 					GCSel := el //- txnode.VTilt
 					var bestBeamID int
-					var Az, El, aasgainDB float64
+					var aasgainDB float64
 					if beamrsrp[txnodeID] == nil {
 						beamrsrp[txnodeID] = new(vlib.VectorF)
 					}
-
-					aasBeamgainDB, bestBeamID, _, _ := antenna.CombPatternDb(GCSaz, GCSel, ant)
+					aasBeamgainDB, bestBeamID, Az, El := antenna.CombPatternDb(GCSaz, GCSel, ant)
 					for id, val := range aasBeamgainDB {
 						tempRSRP := val[0][0] - lossDb - otherLossDb + txnode.TxPowerDBm
-						if val[0][0] > link.MaxAg[0] {
-							link.MaxAg[0] = val[0][0]
+						if val[0][0] > link.MaxAg {
+							// fmt.Println("Check: ", val[0][0], link.MaxAg[0])
+							link.MaxAg = val[0][0]
 							link.MaxTransmitBeamID = id
 						}
 						beamrsrp[txnodeID].AppendAtEnd(tempRSRP)
@@ -354,8 +363,9 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 
 					aasgainDB = aasBeamgainDB[bestBeamID][0][0] // Picking gain from TxRU o,o assuming all TxRUs have same gain/ all beams
 					rxRSRP = aasgainDB - lossDb - otherLossDb + txnode.TxPowerDBm
+
 					if rxRSRP > vlib.Max(link.TxNodesRSRP) {
-						link.AssoAg[0] = aasgainDB
+						link.AssoAg = aasgainDB
 					}
 					link.TxNodesRSRP.AppendAtEnd(rxRSRP)
 					//	_, _, Aagain, result, Ag := antenna.CombPatternDb(Az, El, aasgainDB, 10, 4)
