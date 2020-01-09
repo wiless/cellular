@@ -30,7 +30,12 @@ type LinkMetric struct {
 	BestSINR     float64
 	RoIDbm       float64
 	//AgainDb      float64
-	BestCouplingLoss float64
+	BestCouplingLoss  float64
+	MaxTxAg           float64 // Tx AAS Gain
+	MaxRxAg           float64 // Rx AAS Gain
+	AssoTxAg          float64 // Tx AAS Gain for Associated Link
+	AssoRxAg          float64 // Rx AAS Gain for Associated Link
+	MaxTransmitBeamID int
 }
 
 func (l *LinkMetric) SetParams(fGHz, bwMHz float64) {
