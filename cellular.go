@@ -31,8 +31,10 @@ type LinkMetric struct {
 	RoIDbm       float64
 	//AgainDb      float64
 	BestCouplingLoss  float64
-	MaxAg             float64 //[2]float64 // [Tx AAS Gain, Rx AAS Gain]
-	AssoAg            float64 //[2]float64 // [Tx AAS Gain, Rx AAS Gain] for Associated Link
+	MaxTxAg           float64 // Tx AAS Gain
+	MaxRxAg           float64 // Rx AAS Gain
+	AssoTxAg          float64 // Tx AAS Gain for Associated Link
+	AssoRxAg          float64 // Rx AAS Gain for Associated Link
 	MaxTransmitBeamID int
 }
 
