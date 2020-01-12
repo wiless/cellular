@@ -7,6 +7,79 @@ import (
 	"github.com/wiless/vlib"
 )
 
+func (ant SettingAAS) CombPatternDb(theta, phi float64) (aag map[int]vlib.MatrixF, bestBeamID int, Az, El float64) {
+
+	theta = Wrap180To180(theta)
+	phi = Wrap0To180(phi)
+	var ag float64
+	Az, El, ag = ElementGainDb(theta, phi, ant)
+	hspace := ant.ESpacingHFactor
+	vspace := ant.ESpacingVFactor
+	var sum = complex(0.0, 0.0)
+
+	dtilt := ant.ElectronicTilt // degree
+	descan := ant.Dscan         //degree
+
+	nv := ant.AntennaConfig[0] / ant.AntennaConfig[5]
+	nh := ant.AntennaConfig[1] / ant.AntennaConfig[6]
+
+	var maxgain float64
+	bestBeamID = 0
+	nbeams := len(ant.Dscan) * len(ant.ElectronicTilt)
+	aag = make(map[int]vlib.MatrixF, nbeams)
+
+	c := 1.0 / float64(nv*nh)
+	for i := 0; i < len(dtilt); i++ { //  dtilt is a vector of Zenith Angles of the Beam Set
+		for j := 0; j < len(descan); j++ { // descan is a vector of Azimuth Angles of the Beam Set
+			beamid := j + len(descan)*i
+			sum = 0.0
+			for m := 1; m <= nv; m++ {
+				for n := 1; n <= nh; n++ {
+					phiP := -math.Cos(dtilt[i]*math.Pi/180) + math.Cos(phi*math.Pi/180)
+					phiR := -math.Sin(dtilt[i]*math.Pi/180)*math.Sin(descan[j]*math.Pi/180) + math.Sin(phi*math.Pi/180)*math.Sin(theta*math.Pi/180)
+					w := cmplx.Exp(complex(0, 2*math.Pi*(float64(n-1)*vspace*phiP)))
+					v := cmplx.Exp(complex(0, 2*math.Pi*(float64(m-1)*hspace*phiR)))
+					sum = sum + w*v
+				}
+			}
+			txRUGains := vlib.NewMatrixF(ant.AntennaConfig[5], ant.AntennaConfig[6])
+			for k := 0; k < ant.AntennaConfig[5]; k++ {
+				for l := 0; l < ant.AntennaConfig[6]; l++ {
+					txRUGains[k][l] = ag + (10 * math.Log10(c*math.Pow(cmplx.Abs(sum), 2))) // Composite Beam Gain + Antenna Element Gain
+					_ = ag
+					temp := txRUGains[k][l]
+					if maxgain < temp {
+						maxgain = temp
+						bestBeamID = beamid
+					}
+				}
+			}
+			aag[beamid] = txRUGains
+		}
+	}
+	return aag, bestBeamID, Az, El
+
+}
+
+func ElementGainDb(theta, phi float64, ant SettingAAS) (az, el, Ag float64) {
+	phi = Wrap0To180(phi)
+	theta = Wrap180To180(theta)
+	MaxGaindBi := ant.GainDb   //    0 for ue and 8 for bs
+	theta3dB := ant.HBeamWidth // degree
+	phi3dB := ant.VBeamWidth
+	SLAmax := ant.SLAV
+	Am := SLAmax
+	Ah := -math.Min(12.0*math.Pow(theta/theta3dB, 2.0), Am)
+	MechTiltGCS := ant.BeamTilt // Pointing to Horizon..axis..
+	Av := -math.Min(12.0*math.Pow((phi-MechTiltGCS)/phi3dB, 2.0), SLAmax)
+	result := -math.Min(-math.Floor(Av+Ah), Am)
+	//result = Ah
+	az = Ah
+	el = Av
+	Ag = result + MaxGaindBi
+	return az, el, Ag
+}
+
 // Wrap0To180 wraps the input angle to 0 to 180
 func Wrap0To180(degree float64) float64 {
 	if degree >= 0 && degree <= 180 {
@@ -63,75 +136,6 @@ func BSPatternDb(theta, phi float64) (az, el, Ag float64) {
 	el = Av
 	Ag = result + MaxGaindBi
 	return az, el, Ag
-}
-
-func ElementGainDb(theta, phi float64, ant SettingAAS) (az, el, Ag float64) {
-	phi = Wrap0To180(phi)
-	theta = Wrap180To180(theta)
-	MaxGaindBi := ant.GainDb   //    0 for ue and 8 for bs
-	theta3dB := ant.HBeamWidth // degree
-	phi3dB := ant.VBeamWidth
-	SLAmax := ant.SLAV
-	Am := SLAmax
-	Ah := -math.Min(12.0*math.Pow(theta/theta3dB, 2.0), Am)
-	MechTiltGCS := ant.BeamTilt // Pointing to Horizon..axis..
-	Av := -math.Min(12.0*math.Pow((phi-MechTiltGCS)/phi3dB, 2.0), SLAmax)
-	result := -math.Min(-math.Floor(Av+Ah), Am)
-	//result = Ah
-	az = Ah
-	el = Av
-	Ag = result + MaxGaindBi
-	return az, el, Ag
-}
-
-//CombPatternDb calculates returns all the beam gain for each TxRU
-func CombPatternDb(theta, phi float64, ant SettingAAS) (aag map[int]vlib.MatrixF, bestBeamID int, Az, El float64) {
-	theta = Wrap180To180(theta)
-	phi = Wrap0To180(phi)
-	var ag float64
-	Az, El, ag = ElementGainDb(theta, phi, ant)
-	hspace := ant.ESpacingHFactor
-	vspace := ant.ESpacingVFactor
-	dtilt := ant.ElectronicTilt // degree
-	descan := ant.Dscan         //degree
-	var sum = complex(0.0, 0.0)
-	nv := ant.BSAntennaConfig[0] / ant.BSAntennaConfig[5]
-	nh := ant.BSAntennaConfig[1] / ant.BSAntennaConfig[6]
-	var maxgain float64
-	bestBeamID = 0
-	nbeams := len(ant.Dscan) * len(ant.ElectronicTilt)
-	aag = make(map[int]vlib.MatrixF, nbeams)
-	/////
-	c := 1.0 / float64(nv*nh)
-	for i := 0; i < len(dtilt); i++ { //  dtilt is a vector of Zenith Angles of the Beam Set
-		for j := 0; j < len(descan); j++ { // descan is a vector of Azimuth Angles of the Beam Set
-			beamid := j + len(descan)*i
-			sum = 0.0
-			for m := 1; m <= nv; m++ {
-				for n := 1; n <= nh; n++ {
-					phiP := -math.Cos(dtilt[i]*math.Pi/180) + math.Cos(phi*math.Pi/180)
-					phiR := -math.Sin(dtilt[i]*math.Pi/180)*math.Sin(descan[j]*math.Pi/180) + math.Sin(phi*math.Pi/180)*math.Sin(theta*math.Pi/180)
-					w := cmplx.Exp(complex(0, 2*math.Pi*(float64(n-1)*vspace*phiP)))
-					v := cmplx.Exp(complex(0, 2*math.Pi*(float64(m-1)*hspace*phiR)))
-					sum = sum + w*v
-				}
-			}
-			txRUGains := vlib.NewMatrixF(ant.BSAntennaConfig[5], ant.BSAntennaConfig[6])
-			for k := 0; k < ant.BSAntennaConfig[5]; k++ {
-				for l := 0; l < ant.BSAntennaConfig[6]; l++ {
-					txRUGains[k][l] = ag + (10 * math.Log10(c*math.Pow(cmplx.Abs(sum), 2))) // Composite Beam Gain + Antenna Element Gain
-					_ = ag
-					temp := txRUGains[k][l]
-					if maxgain < temp {
-						maxgain = temp
-						bestBeamID = beamid
-					}
-				}
-			}
-			aag[beamid] = txRUGains
-		}
-	}
-	return aag, bestBeamID, Az, El
 }
 
 // BSPatternIndoorHS_Db generates the antenna gain for given theta,phi
