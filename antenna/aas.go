@@ -103,7 +103,10 @@ type SettingAAS struct {
 	CurveWidthInDegree               float64
 	CurveRadius                      float64
 	GainDb                           float64
+	PanelAz                          []float64
+	PanelEl                          []float64
 	AntennaConfig                    []int
+	Polarization                     []float64
 }
 
 func (s *SettingAAS) SetDefault() {
@@ -128,6 +131,9 @@ func (s *SettingAAS) SetDefault() {
 	s.CurveWidthInDegree = 0
 	s.GainDb = 0
 	s.AntennaConfig = []int{8, 8, 2, 1, 1, 2, 1}
+	s.PanelAz = []float64{0.0}
+	s.PanelEl = []float64{90.0}
+	s.Polarization = []float64{45.0, -45.0}
 }
 
 func NewAAS() *SettingAAS {
