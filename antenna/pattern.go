@@ -37,8 +37,8 @@ func (ant SettingAAS) CombPatternDb(theta, phi float64) (aag map[int]vlib.Matrix
 				for n := 1; n <= nh; n++ {
 					phiP := -math.Cos(dtilt[i]*math.Pi/180) + math.Cos(phi*math.Pi/180)
 					phiR := -math.Sin(dtilt[i]*math.Pi/180)*math.Sin(descan[j]*math.Pi/180) + math.Sin(phi*math.Pi/180)*math.Sin(theta*math.Pi/180)
-					w := cmplx.Exp(complex(0, 2*math.Pi*(float64(m-1)*vspace*phiP)))
-					v := cmplx.Exp(complex(0, 2*math.Pi*(float64(n-1)*hspace*phiR)))
+					w := cmplx.Exp(complex(0, 2*math.Pi*(float64(n-1)*vspace*phiP)))
+					v := cmplx.Exp(complex(0, 2*math.Pi*(float64(m-1)*hspace*phiR)))
 					sum = sum + w*v
 				}
 			}
@@ -60,24 +60,6 @@ func (ant SettingAAS) CombPatternDb(theta, phi float64) (aag map[int]vlib.Matrix
 	return aag, bestBeamID, Az, El
 
 }
-
-// Antenna Gain per panel
-// func (ant SettingAAS) CombPatternDb(theta, phi float64) (aag map[int]Panel, bestBeamID int, Az, El float64) {
-
-// 	total_panels := ant.AntennaConfig[3] * ant.AntennaConfig[4]
-// 	aag = make(map[int][int]vlib.MatrixF, total_panels)
-// 	for panel := 0; panel < total_panels; panel++ {
-// 		aag_temp, bestBeamID, Az, El := ant.combPatternDb(theta, phi)
-// 		aag[panel] = aag_temp
-// 	}
-
-// 	return aag, bestBeamID, Az, El
-// }
-
-// type Panel struct {
-// 	BeamGain   map[int]vlib.MatrixF
-// 	BestBeamID int
-// }
 
 func ElementGainDb(theta, phi float64, ant SettingAAS) (az, el, Ag float64) {
 	phi = Wrap0To180(phi)

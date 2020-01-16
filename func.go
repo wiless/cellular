@@ -351,24 +351,10 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 						beamrsrp[txnodeID] = new(vlib.VectorF)
 					}
 
-					_, Rx_az, Rx_el := vlib.RelativeGeo(rxnode.Location, txnode.Location)
-					Rx_el = -Rx_el + 90.0
-					Rx_GCSaz := Rx_az - rxnode.Direction
-					if Rx_GCSaz > 180 {
-						Rx_GCSaz = -360 + Rx_GCSaz
-					}
-					if Rx_GCSaz < -180 {
-						Rx_GCSaz = 360 + Rx_GCSaz
-					}
-					if math.Abs(Rx_GCSaz) > 180 {
-						fmt.Println("Error in Orientation", Rx_GCSaz)
-					}
-					Rx_GCSel := Rx_el
-
 					BSaasBeamgainDB, BSbestBeamID, Az, El := txant.CombPatternDb(GCSaz, GCSel)
 
 					if rxant.Omni == false {
-						UEaasBeamgainDB, UEbestBeamID, _, _ := rxant.CombPatternDb(Rx_GCSaz, Rx_GCSel)
+						UEaasBeamgainDB, UEbestBeamID, _, _ := rxant.CombPatternDb(GCSaz, GCSel)
 						UEaasgainDB = UEaasBeamgainDB[UEbestBeamID][0][0]
 					} else {
 						UEaasgainDB = 0.0
