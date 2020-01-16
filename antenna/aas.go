@@ -103,7 +103,10 @@ type SettingAAS struct {
 	CurveWidthInDegree               float64
 	CurveRadius                      float64
 	GainDb                           float64
-	BSAntennaConfig                  []int
+	PanelAz                          []float64
+	PanelEl                          []float64
+	AntennaConfig                    []int
+	Polarization                     []float64
 }
 
 func (s *SettingAAS) SetDefault() {
@@ -113,9 +116,9 @@ func (s *SettingAAS) SetDefault() {
 	s.Omni = false
 	s.MfileName = "output.m"
 	s.VTiltAngle = 0
+	s.Dscan = []float64{0}
 	s.ElectronicTilt = []float64{14}
 	s.HTiltAngle = 0
-	s.Dscan = []float64{0}
 	s.BeamTilt = 90
 	s.HBeamWidth = 65
 	s.VBeamWidth = 65
@@ -127,7 +130,10 @@ func (s *SettingAAS) SetDefault() {
 	s.CurveRadius = 0
 	s.CurveWidthInDegree = 0
 	s.GainDb = 0
-	s.BSAntennaConfig = []int{8, 8, 2, 1, 1, 2, 1}
+	s.AntennaConfig = []int{8, 8, 2, 1, 1, 2, 1}
+	s.PanelAz = []float64{0.0}
+	s.PanelEl = []float64{90.0}
+	s.Polarization = []float64{45.0, -45.0}
 }
 
 func NewAAS() *SettingAAS {
