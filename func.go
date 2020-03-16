@@ -239,6 +239,8 @@ func (w *WSystem) EvaluateLinkMetricV2(singlecell *deployment.DropSystem, model 
 
 // EvaluateLinkMetricV3 evaluates the link metric with PL model interface and also dumps details of the coupling loss into linklogfname (csv)
 // if linklogfname="" it does not dump
+// EvaluateLinkMetricV3 evaluates the link metric with PL model interface and also dumps details of the coupling loss into linklogfname (csv)
+// if linklogfname="" it does not dump
 func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model CM.PLModel, rxid int, afn AntennaOfTxNode, fid *os.File) LinkMetric {
 
 	var LOG = true
@@ -267,6 +269,8 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 	if rxnode.FreqGHz.Contains(systemFrequencyGHz) {
 		link.MaxTxAg = -1000.0
 		link.AssoTxAg = -1000.0
+		link.MaxRxAg = -1000.0
+		link.AssoRxAg = -1000.0
 		link.FreqInGHz = systemFrequencyGHz
 		link.RxNodeID = rxid
 		link.BestRSRP = -1000
@@ -284,8 +288,9 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 			if found := txnode.FreqGHz.Contains(systemFrequencyGHz); found {
 				nlinks++
 				link.TxNodeIDs.AppendAtEnd(txnodeID)
-				ant := afn(txnodeID)
-
+				//ant := afn(txnodeID)
+				var rxant antenna.SettingAAS = afn(rxid)
+				var txant antenna.SettingAAS = afn(txnodeID)
 				var lossDb float64
 				var dist float64
 				var d2In float64 = 0
@@ -293,6 +298,7 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 				var islos bool
 				extraloss := 0.0
 				inloss := 0.0
+				carloss := 0.0
 				lossDb = DEFAULTERR_PL
 				rxRSRP := -DEFAULTERR_PL
 				var plerr error
@@ -311,6 +317,10 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 					if rxnode.Indoor {
 						inloss = model.O2ILossDb(systemFrequencyGHz, d2In)
 						otherLossDb += inloss
+					}
+					if rxnode.InCar {
+						carloss += model.O2ICarLossDb()
+						otherLossDb += carloss
 					}
 
 					if w.OtherLossFn != nil {
@@ -342,36 +352,72 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 						fmt.Println("Error in Orientation", GCSaz)
 					}
 					GCSel := el
-					var bestBeamID int
-					var aasgainDB float64
+					var BSbestBeamID int
+					var BSaasgainDB float64
+					var UEaasgainDB float64
+
 					if beamrsrp[txnodeID] == nil {
 						beamrsrp[txnodeID] = new(vlib.VectorF)
 					}
-					aasBeamgainDB, bestBeamID, Az, El := antenna.CombPatternDb(GCSaz, GCSel, ant)
-					for id, val := range aasBeamgainDB {
-						tempRSRP := val[0][0] - lossDb - otherLossDb + txnode.TxPowerDBm
-						if val[0][0] > link.MaxTxAg {
-							link.MaxTxAg = val[0][0]
-							link.MaxTransmitBeamID = id
-						}
-						beamrsrp[txnodeID].AppendAtEnd(tempRSRP)
+
+					_, Rxaz, Rxel := vlib.RelativeGeo(rxnode.Location, txnode.Location)
+					Rxel = -Rxel + 90.0
+					RxGCSaz := Rxaz - rxnode.Direction
+					if RxGCSaz > 180 {
+						RxGCSaz = -360 + RxGCSaz
 					}
-					aasgainDB = aasBeamgainDB[bestBeamID][0][0] // Picking gain from TxRU o,o assuming all TxRUs have same gain/ all beams
-					rxRSRP = aasgainDB - lossDb - otherLossDb + txnode.TxPowerDBm
+					if RxGCSaz < -180 {
+						RxGCSaz = 360 + RxGCSaz
+					}
+					if math.Abs(RxGCSaz) > 180 {
+						fmt.Println("Error in Orientation", RxGCSaz)
+					}
+					RxGCSel := Rxel
+
+					BSaasBeamgainDB, BSbestPanelID, BSbestBeamID, _, _ := txant.CombPatternDb(GCSaz, GCSel)
+
+					if rxant.Omni == false {
+						UEaasBeamgainDB, UEbestPanelID, UEbestBeamID, _, _ := rxant.CombPatternDb(RxGCSaz, RxGCSel)
+						UEaasgainDB = UEaasBeamgainDB[UEbestPanelID][UEbestBeamID][0][0]
+						// config.PrintStructsPretty(UEaasBeamgainDB)
+						// fmt.Println("MaxPanelID: ", UEbestPanelID, "MaxBeamID: ", UEbestBeamID, "Max AAS Gain: ", UEaasgainDB)
+						if UEaasgainDB > link.MaxRxAg {
+							link.MaxRxAg = UEaasgainDB
+						}
+					} else {
+						UEaasgainDB = 0.0
+					}
+
+					for _, valpanel := range BSaasBeamgainDB {
+						for beamID, valbeam := range valpanel {
+							tempRSRP := UEaasgainDB + valbeam[0][0] - lossDb - otherLossDb + txnode.TxPowerDBm
+							if valbeam[0][0] > link.MaxTxAg {
+								link.MaxTxAg = valbeam[0][0]
+								link.MaxTransmitBeamID = beamID
+							}
+							beamrsrp[txnodeID].AppendAtEnd(tempRSRP)
+						}
+					}
+					BSaasgainDB = BSaasBeamgainDB[BSbestPanelID][BSbestBeamID][0][0] // Picking gain from TxRU o,o assuming all TxRUs have same gain/ all beams
+					// config.PrintStructsPretty(BSaasBeamgainDB)
+					// fmt.Println("===================  Rxid:", rxnode.ID, "Txid: ", txnodeID, BSaasBeamgainDB[0][0].Get(0, 0))
+					// fmt.Println("MaxPanelID: ", BSbestPanelID, "MaxBeamID: ", BSbestBeamID, "Max AAS Gain: ", BSaasgainDB)
+					rxRSRP = UEaasgainDB + BSaasgainDB - lossDb - otherLossDb + txnode.TxPowerDBm
 
 					if rxRSRP > vlib.Max(link.TxNodesRSRP) || link.AssoTxAg == -1000.0 {
-						link.AssoTxAg = aasgainDB
+						link.AssoTxAg = BSaasgainDB
+						link.AssoRxAg = UEaasgainDB
 					}
 					link.TxNodesRSRP.AppendAtEnd(rxRSRP)
 
 					if LOG {
-						fmt.Fprintf(fid, "\n %d \t %d \t %5.2f \t %f \t %t \t %f \t %f \t %f \t %f \t %f \t %f \t %f \t %f \t %f \t %f ", rxid, txnodeID, d3d, rxnode.Location.Z, islos, rxRSRP-txnode.TxPowerDBm, lossDb, inloss, extraloss, txnode.TxPowerDBm, aasgainDB, Az, GCSaz, El, GCSel)
+						fmt.Fprintf(fid, "\n%d,%d,%5.2f,%f,%t,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f", rxid, txnodeID, d3d, rxnode.Location.Z, islos, rxRSRP-txnode.TxPowerDBm, lossDb, inloss, carloss, extraloss, txnode.TxPowerDBm, BSaasgainDB, UEaasgainDB, GCSaz, GCSel, RxGCSaz, RxGCSel)
 					}
 
 					rxdebugnode = false
 					if rxdebugnode {
 						_ = dist
-						fmt.Printf("\r EVAL2 Rx-Tx (LOS:%v) %d-%d rxRSRP =%v,Power=%f,AAS =%f ,PL = %f, otherLoss=%f , dist =%v, d2In: =%v", islos, rxid, txnodeID, rxRSRP, txnode.TxPowerDBm, aasgainDB, lossDb, otherLossDb, dist, d2In)
+						fmt.Printf("\r EVAL2 Rx-Tx (LOS:%v) %d-%d rxRSRP =%v,Power=%f,AAS =%f ,PL = %f, otherLoss=%f , dist =%v, d2In: =%v", islos, rxid, txnodeID, rxRSRP, txnode.TxPowerDBm, BSaasgainDB, lossDb, otherLossDb, dist, d2In)
 						if rxnode.Indoor || rxnode.InCar {
 							fmt.Println("\n Found in Indoor ", d2In, inloss, extraloss)
 						}
@@ -403,6 +449,7 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 			link.TxNodeIDs = link.TxNodeIDs.At(indx.Flip()...) // Sort it
 			link.TxNodesRSRP = sortedRxrp.Flip()
 			link.BestRSRP = link.TxNodesRSRP[0]
+			// link.BestRSRPNode = singlecell.Nodes[link.TxNodeIDs[0]].Alias() + int(float64(len(alltxNodeIds)/3)*math.Floor(float64(link.TxNodeIDs[0]/(len(alltxNodeIds)/3))))
 			link.BestRSRPNode = link.TxNodeIDs[0]
 			link.BestCouplingLoss = link.BestRSRP - singlecell.Nodes[link.BestRSRPNode].TxPowerDBm
 			if totalrssi == maxrsrp {
@@ -420,16 +467,10 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 				}
 				rssi = rssi + vlib.InvDb(link.N0)
 				link.RSSI = rssi + maxrsrp
-				link.BestSINR = vlib.Db(maxrsrp) - vlib.Db(rssi)
+				link.BestSINR = vlib.Db(maxrsrp) - vlib.Db(rssi) //vlib.Db(totalrssi-maxrsrp)
 			}
-
 		}
 	}
 
 	return link
 }
-
-// func (link *LinkMetric) uplinkSINREval() (snr, sinr, sinrparam) {
-
-// 	return snr, sinr, sinrparam
-// }
