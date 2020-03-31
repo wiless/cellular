@@ -360,7 +360,7 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 						beamrsrp[txnodeID] = new(vlib.VectorF)
 					}
 
-					_, Rxaz, Rxel := vlib.RelativeGeo(rxnode.Location, txnode.Location)
+ 					_, Rxaz, Rxel := vlib.RelativeGeo(rxnode.Location, txnode.Location)
 					Rxel = -Rxel + 90.0
 					RxGCSaz := Rxaz - rxnode.Direction
 					if RxGCSaz > 180 {
@@ -402,11 +402,12 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 					// config.PrintStructsPretty(BSaasBeamgainDB)
 					// fmt.Println("===================  Rxid:", rxnode.ID, "Txid: ", txnodeID, BSaasBeamgainDB[0][0].Get(0, 0))
 					// fmt.Println("MaxPanelID: ", BSbestPanelID, "MaxBeamID: ", BSbestBeamID, "Max AAS Gain: ", BSaasgainDB)
+
 					rxRSRP = UEaasgainDB + BSaasgainDB - lossDb - otherLossDb + txnode.TxPowerDBm
 
 					if rxRSRP > vlib.Max(link.TxNodesRSRP) || link.AssoTxAg == -1000.0 {
 						link.AssoTxAg = BSaasgainDB
-						link.AssoRxAg = UEaasgainDB
+ 						link.AssoRxAg = UEaasgainDB
 					}
 					link.TxNodesRSRP.AppendAtEnd(rxRSRP)
 

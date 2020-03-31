@@ -7,6 +7,7 @@ import (
 	"github.com/wiless/vlib"
 )
 
+ 
 func (ant SettingAAS) panelorientation(theta float64, indx int) float64 {
 	if len(ant.PanelAz) < 2 {
 		return theta
@@ -60,12 +61,12 @@ func (ant SettingAAS) combPatternDb(theta, phi float64) (aag map[int]vlib.Matrix
 	nv := ant.AntennaConfig[0] / ant.AntennaConfig[5]
 	nh := ant.AntennaConfig[1] / ant.AntennaConfig[6]
 
-	maxgain := -1000.0
+ 	maxgain := -1000.0
 	bestBeamID = 0
 	nbeams := len(ant.Dscan) * len(ant.ElectronicTilt)
 	aag = make(map[int]vlib.MatrixF, nbeams)
 
-	var c = complex(math.Sqrt(1/float64(nv*nh)), 0)
+ 	var c = complex(math.Sqrt(1/float64(nv*nh)), 0)
 	for i := 0; i < len(dtilt); i++ { //  dtilt is a vector of Zenith Angles of the Beam Set
 		for j := 0; j < len(descan); j++ { // descan is a vector of Azimuth Angles of the Beam Set
 			beamid := j + len(descan)*i
@@ -76,13 +77,13 @@ func (ant SettingAAS) combPatternDb(theta, phi float64) (aag map[int]vlib.Matrix
 					phiR := -math.Sin(dtilt[i]*math.Pi/180)*math.Sin(descan[j]*math.Pi/180) + math.Sin(phi*math.Pi/180)*math.Sin(theta*math.Pi/180)
 					w := cmplx.Exp(complex(0, 2*math.Pi*(float64(m-1)*vspace*phiP)))
 					v := cmplx.Exp(complex(0, 2*math.Pi*(float64(n-1)*hspace*phiR)))
-					sum = sum + c*cmplx.Conj(w*v)
-				}
+ 					sum = sum + c*cmplx.Conj(w*v)
+ 				}
 			}
 			txRUGains := vlib.NewMatrixF(ant.AntennaConfig[5], ant.AntennaConfig[6])
 			for k := 0; k < ant.AntennaConfig[5]; k++ {
 				for l := 0; l < ant.AntennaConfig[6]; l++ {
-					txRUGains[k][l] = ag + (10 * math.Log10(math.Pow(cmplx.Abs(sum), 2))) // Composite Beam Gain + Antenna Element Gain
+ 					txRUGains[k][l] = ag + (10 * math.Log10(math.Pow(cmplx.Abs(sum), 2))) // Composite Beam Gain + Antenna Element Gain
 					temp := txRUGains[k][l]
 					if maxgain < temp {
 						maxgain = temp
@@ -124,7 +125,7 @@ func ElementGainDb(theta, phi float64, ant SettingAAS) (az, el, Ag float64) {
 	SLAmax := ant.SLAV
 	Am := SLAmax
 	Ah := -math.Min(12.0*math.Pow(theta/theta3dB, 2.0), Am)
-	// fmt.Println("Horizontal Gain: ", Ah)
+ 	// fmt.Println("Horizontal Gain: ", Ah)
 	MechTiltGCS := ant.BeamTilt // Pointing to Horizon..axis..
 	Av := -math.Min(12.0*math.Pow((phi-MechTiltGCS)/phi3dB, 2.0), SLAmax)
 	result := -math.Min(-(Av + Ah), Am)
@@ -133,6 +134,7 @@ func ElementGainDb(theta, phi float64, ant SettingAAS) (az, el, Ag float64) {
 	el = Av
 
 	Ag = result + MaxGaindBi
+
 
 	return az, el, Ag
 }
