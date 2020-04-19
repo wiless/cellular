@@ -6,7 +6,7 @@ import (
 	"math/rand"
 	"os"
 
-	log "github.com/Sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"github.com/wiless/cellular/antenna"
 	"github.com/wiless/cellular/deployment"
 	CM "github.com/wiless/channelmodel"
