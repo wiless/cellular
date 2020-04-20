@@ -35,7 +35,7 @@ type Node struct {
 	Mode             TxRxMode `json:"TxRxMode"`
 	alias            int
 	Active           bool
-	RxNoiseFigureDbm float64 // NoiseFigure of the
+	RxNoiseFigureDbm float64 // NoiseFigure of the receiver
 }
 
 func (n Node) Alias() int {
@@ -580,6 +580,7 @@ func (d *DropSystem) SetAllNodeLocation(ntype string, locations vlib.VectorC) {
 	}
 
 	for indx, val := range notype.NodeIDs {
+
 		node := d.Nodes[val]
 		node.Location.SetXY(real(locations[indx]), imag(locations[indx]))
 		d.Nodes[val] = node
@@ -682,11 +683,11 @@ func ForceMinDistance(in vlib.VectorC, d, hexradius float64) vlib.VectorC {
 	if d == 0 {
 		return in
 	}
-	log.Println("I am being called")
+	// log.Println("I am being called")
 	dist := in.Abs()
 	indx := dist.FindLess(d)
 	if indx.Size() > 0 {
-		log.Printf("Found .. %d items of %d < MinDistance %f ", indx.Size(), in.Size(), d)
+		// log.Printf("Found .. %d items of %d < MinDistance %f ", indx.Size(), in.Size(), d)
 		newpos := HexRandPoints(indx.Size(), hexradius)
 
 		for i, pos := range newpos {

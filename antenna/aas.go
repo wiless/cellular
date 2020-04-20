@@ -24,6 +24,127 @@ type cvec cblas128.Vector
 type Dim struct {
 	R, C int
 }
+var Nodes = 360
+var Radius float64 = 1
+
+var imagval complex128 = 0 + 1i
+
+var freq float64 = 2.0e9
+var cspeed float64 = 3.0e8
+var mfileName string
+
+// var omni bool
+
+var Bobwriter io.Writer
+
+// var VBeamWidth, HBeamWidth float64 = 65, 65
+
+// type SettingAAS struct {
+// 	UID                              string `datastore:"-" json:"uid"`
+// 	NodeID                           int    // Associated Node ID where relevant
+// 	elementLocations                 []vlib.Location3D
+// 	lamda                            float64
+// 	FreqHz                           float64
+// 	hColumns                         float64 // To be exported later
+// 	N                                int
+// 	Nodes                            int
+// 	Omni                             bool
+// 	MfileName                        string
+// 	VTiltAngle                       float64
+// 	HTiltAngle                       float64
+// 	BeamTilt                         float64
+// 	DisableBeamTit                   bool
+// 	HoldOn                           bool
+// 	VBeamWidth, HBeamWidth           float64
+// 	SLAV                             float64
+// 	ESpacingVFactor, ESpacingHFactor float64
+// 	Centre                           vlib.Location3D
+// 	weightVector                     vlib.VectorC
+// 	AASArrayType                     ArrayType
+// 	CurveWidthInDegree               float64
+// 	CurveRadius                      float64
+// 	GainDb                           float64
+// }
+
+// func (s *SettingAAS) SetDefault() {
+// 	s.FreqHz = 2.0e9
+// 	s.N = 1
+// 	s.Nodes = 360
+// 	s.Omni = false
+// 	s.MfileName = "output.m"
+// 	s.VTiltAngle = 14
+// 	s.HTiltAngle = 0
+// 	s.HBeamWidth = 65
+// 	s.VBeamWidth = 65
+// 	s.SLAV = 30.0
+// 	s.lamda = cspeed / freq
+// 	s.ESpacingHFactor = 0 /// Factor mulplied by params.lamda
+// 	s.ESpacingVFactor = .5
+// 	s.AASArrayType = LinearPhaseArray
+// 	s.CurveRadius = 0
+// 	s.CurveWidthInDegree = 0
+// 	s.GainDb = 0
+// }
+
+type SettingAAS struct {
+	UID                              string `datastore:"-" json:"uid"`
+	NodeID                           int    // Associated Node ID where relevant
+	elementLocations                 []vlib.Location3D
+	lamda                            float64
+	FreqHz                           float64
+	hColumns                         float64 // To be exported later
+	N                                int
+	Nodes                            int
+	Omni                             bool
+	MfileName                        string
+	VTiltAngle                       float64
+	ElectronicTilt                   []float64
+	Dscan                            []float64
+	HTiltAngle                       float64
+	BeamTilt                         float64
+	DisableBeamTit                   bool
+	HoldOn                           bool
+	VBeamWidth, HBeamWidth           float64
+	SLAV                             float64
+	ESpacingVFactor, ESpacingHFactor float64
+	Centre                           vlib.Location3D
+	weightVector                     vlib.VectorC
+	AASArrayType                     ArrayType
+	CurveWidthInDegree               float64
+	CurveRadius                      float64
+	GainDb                           float64
+	PanelAz                          []float64
+	PanelEl                          []float64
+	AntennaConfig                    []int
+	Polarization                     []float64
+}
+
+func (s *SettingAAS) SetDefault() {
+	s.FreqHz = 2.0e9
+	s.N = 1
+	s.Nodes = 360
+	s.Omni = false
+	s.MfileName = "output.m"
+	s.VTiltAngle = 0
+	s.Dscan = []float64{0}
+	s.ElectronicTilt = []float64{14}
+	s.HTiltAngle = 0
+	s.BeamTilt = 90
+	s.HBeamWidth = 65
+	s.VBeamWidth = 65
+	s.SLAV = 30.0
+	s.lamda = cspeed / freq
+	s.ESpacingHFactor = 0 /// Factor mulplied by params.lamda
+	s.ESpacingVFactor = .5
+	s.AASArrayType = LinearPhaseArray
+	s.CurveRadius = 0
+	s.CurveWidthInDegree = 0
+	s.GainDb = 0
+	s.AntennaConfig = []int{8, 8, 2, 1, 1, 2, 1}
+	s.PanelAz = []float64{0.0}
+	s.PanelEl = []float64{90.0}
+	s.Polarization = []float64{45.0, -45.0}
+}
 
 type Beam struct {
 	HEtilt float64 // in radians
