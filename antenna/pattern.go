@@ -7,7 +7,6 @@ import (
 	"github.com/wiless/vlib"
 )
 
- 
 func (ant SettingAAS) panelorientation(theta float64, indx int) float64 {
 	if len(ant.PanelAz) < 2 {
 		return theta
@@ -61,29 +60,28 @@ func (ant SettingAAS) combPatternDb(theta, phi float64) (aag map[int]vlib.Matrix
 	nv := ant.AntennaConfig[0] / ant.AntennaConfig[5]
 	nh := ant.AntennaConfig[1] / ant.AntennaConfig[6]
 
- 	maxgain := -1000.0
+	maxgain := -1000.0
 	bestBeamID = 0
 	nbeams := len(ant.Dscan) * len(ant.ElectronicTilt)
 	aag = make(map[int]vlib.MatrixF, nbeams)
-
- 	var c = complex(math.Sqrt(1/float64(nv*nh)), 0)
+	var c = complex(math.Sqrt(1/float64(nv*nh)), 0)
 	for i := 0; i < len(dtilt); i++ { //  dtilt is a vector of Zenith Angles of the Beam Set
 		for j := 0; j < len(descan); j++ { // descan is a vector of Azimuth Angles of the Beam Set
 			beamid := j + len(descan)*i
 			sum = 0.0
+			phiP := -math.Cos(dtilt[i]*math.Pi/180) + math.Cos((phi-ant.BeamTilt+90)*math.Pi/180)
+			phiR := -math.Sin(dtilt[i]*math.Pi/180)*math.Sin(descan[j]*math.Pi/180) + math.Sin((phi-ant.BeamTilt+90)*math.Pi/180)*math.Sin(theta*math.Pi/180)
 			for m := 1; m <= nv; m++ {
 				for n := 1; n <= nh; n++ {
-					phiP := -math.Cos(dtilt[i]*math.Pi/180) + math.Cos(phi*math.Pi/180)
-					phiR := -math.Sin(dtilt[i]*math.Pi/180)*math.Sin(descan[j]*math.Pi/180) + math.Sin(phi*math.Pi/180)*math.Sin(theta*math.Pi/180)
 					w := cmplx.Exp(complex(0, 2*math.Pi*(float64(m-1)*vspace*phiP)))
 					v := cmplx.Exp(complex(0, 2*math.Pi*(float64(n-1)*hspace*phiR)))
- 					sum = sum + c*cmplx.Conj(w*v)
- 				}
+					sum = sum + c*w*v
+				}
 			}
 			txRUGains := vlib.NewMatrixF(ant.AntennaConfig[5], ant.AntennaConfig[6])
 			for k := 0; k < ant.AntennaConfig[5]; k++ {
 				for l := 0; l < ant.AntennaConfig[6]; l++ {
- 					txRUGains[k][l] = ag + (10 * math.Log10(math.Pow(cmplx.Abs(sum), 2))) // Composite Beam Gain + Antenna Element Gain
+					txRUGains[k][l] = ag + (10 * math.Log10(math.Pow(cmplx.Abs(sum), 2))) // Composite Beam Gain + Antenna Element Gain
 					temp := txRUGains[k][l]
 					if maxgain < temp {
 						maxgain = temp
@@ -98,44 +96,21 @@ func (ant SettingAAS) combPatternDb(theta, phi float64) (aag map[int]vlib.Matrix
 
 }
 
-// Antenna Gain per panel
-// func (ant SettingAAS) CombPatternDb(theta, phi float64) (aag map[int]Panel, bestBeamID int, Az, El float64) {
-
-// 	total_panels := ant.AntennaConfig[3] * ant.AntennaConfig[4]
-// 	aag = make(map[int][int]vlib.MatrixF, total_panels)
-// 	for panel := 0; panel < total_panels; panel++ {
-// 		aag_temp, bestBeamID, Az, El := ant.combPatternDb(theta, phi)
-// 		aag[panel] = aag_temp
-// 	}
-
-// 	return aag, bestBeamID, Az, El
-// }
-
-// type Panel struct {
-// 	BeamGain   map[int]vlib.MatrixF
-// 	BestBeamID int
-// }
-
 func ElementGainDb(theta, phi float64, ant SettingAAS) (az, el, Ag float64) {
 	phi = Wrap0To180(phi)
 	theta = Wrap180To180(theta)
-	MaxGaindBi := ant.GainDb   //    0 for ue and 8 for bs
-	theta3dB := ant.HBeamWidth // degree
-	phi3dB := ant.VBeamWidth
+	MaxGaindBi := ant.GainDb
+	theta3dB := ant.HBeamWidth // Degree
+	phi3dB := ant.VBeamWidth   // Degree
 	SLAmax := ant.SLAV
 	Am := SLAmax
 	Ah := -math.Min(12.0*math.Pow(theta/theta3dB, 2.0), Am)
- 	// fmt.Println("Horizontal Gain: ", Ah)
-	MechTiltGCS := ant.BeamTilt // Pointing to Horizon..axis..
+	MechTiltGCS := ant.BeamTilt // 90 Degree is pointing towards the Direction perpendicular to the Panel..
 	Av := -math.Min(12.0*math.Pow((phi-MechTiltGCS)/phi3dB, 2.0), SLAmax)
 	result := -math.Min(-(Av + Ah), Am)
-	//result = Ah
 	az = Ah
 	el = Av
-
 	Ag = result + MaxGaindBi
-
-
 	return az, el, Ag
 }
 
