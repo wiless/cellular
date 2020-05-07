@@ -1,9 +1,9 @@
 package cellular
 
 import (
-	"sync"
+	// "sync"
 
-	"github.com/wiless/gocomm"
+	// "github.com/wiless/gocomm"
 	"github.com/wiless/vlib"
 )
 
@@ -69,18 +69,18 @@ func CreateSimpleLink(rxid, txid int, snrDb float64) LinkMetric {
 	return result
 }
 
-type Transmitter interface {
-	SetWaitGroup(wg *sync.WaitGroup)
-	GetChannel() gocomm.Complex128AChannel
-	GetID() int
-	StartTransmit()
-	GetSeed() int64
-	IsActive() bool
-}
+// type Transmitter interface {
+// 	SetWaitGroup(wg *sync.WaitGroup)
+// 	GetChannel() gocomm.Complex128AChannel
+// 	GetID() int
+// 	StartTransmit()
+// 	GetSeed() int64
+// 	IsActive() bool
+// }
 
-type Receiver interface {
-	GetID() int
-	SetWaitGroup(wg *sync.WaitGroup)
-	StartReceive(rxch gocomm.Complex128AChannel)
-	IsActive() bool
-}
+// type Receiver interface {
+// 	GetID() int
+// 	SetWaitGroup(wg *sync.WaitGroup)
+// 	StartReceive(rxch gocomm.Complex128AChannel)
+// 	IsActive() bool
+// }
