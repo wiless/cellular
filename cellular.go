@@ -3,7 +3,6 @@ package cellular
 import (
 	// "sync"
 
-	// "github.com/wiless/gocomm"
 	"github.com/wiless/vlib"
 )
 
