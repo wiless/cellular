@@ -462,6 +462,7 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 			sortedRxrp, indx := link.TxNodesRSRP.Sorted2()
 			link.TxNodeIDs = link.TxNodeIDs.At(indx.Flip()...) // Sort it
 			link.TxNodesRSRP = sortedRxrp.Flip()
+
 			link.BestRSRP = link.TxNodesRSRP[0]
 			// link.BestRSRPNode = singlecell.Nodes[link.TxNodeIDs[0]].Alias() + int(float64(len(alltxNodeIds)/3)*math.Floor(float64(link.TxNodeIDs[0]/(len(alltxNodeIds)/3))))
 			link.BestRSRPNode = link.TxNodeIDs[0]

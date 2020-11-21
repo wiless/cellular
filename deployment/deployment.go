@@ -361,8 +361,8 @@ func (d *DropSetting) AddNodeType(ntype NodeType) {
 func (d *DropSetting) SetDefaults() {
 	d.SetCoverage(CircularCoverage(100))
 
-	bs := *NewNodeType("BS", 20)
-	ue := *NewNodeType("UE", 0)
+	bs := *NewNodeType("BS", 1)
+	ue := *NewNodeType("UE", 10)
 	d.AddNodeType(bs)
 	d.AddNodeType(ue)
 
