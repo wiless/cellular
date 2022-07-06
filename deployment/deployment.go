@@ -736,6 +736,7 @@ func HexGridRandU(GridCentre complex128, hexCellCount int, hexRadius float64, Np
 	return result
 }
 
+// HexVertices returns the 6 vertices of a Hexagonal with center , having length of sides=ISD/sqrt(3)
 func HexVertices(centre complex128, length float64, degree float64) vlib.VectorC {
 	result := vlib.NewVectorC(6)
 	// degree := 0.0

@@ -10,6 +10,7 @@ import (
 	"github.com/wiless/cellular/antenna"
 	"github.com/wiless/cellular/deployment"
 	CM "github.com/wiless/channelmodel"
+	"github.com/wiless/d3"
 	"github.com/wiless/vlib"
 )
 
@@ -238,11 +239,10 @@ func (w *WSystem) EvaluateLinkMetricV2(singlecell *deployment.DropSystem, model 
 }
 
 // EvaluateLinkMetricV3 evaluates the link metric with PL model interface and also dumps details of the coupling loss into linklogfname (csv)
-// if linklogfname="" it does not dump
-// EvaluateLinkMetricV3 evaluates the link metric with PL model interface and also dumps details of the coupling loss into linklogfname (csv)
-// if linklogfname="" it does not dump
-func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model CM.PLModel, rxid int, afn AntennaOfTxNode, fid *os.File) LinkMetric {
-
+// if linklogfname="" it does not dump options="MINILINK" enables minilink properties
+func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model CM.PLModel, rxid int, afn AntennaOfTxNode, fid *os.File, options ...string) LinkMetric {
+	var minilink bool
+	minilink, _ = vlib.Contains(options, "MINILINK")
 	var LOG = true
 	if fid == nil {
 		LOG = false
@@ -425,7 +425,37 @@ func (w *WSystem) EvaluateLinkMetricV3(singlecell *deployment.DropSystem, model 
 					}
 					link.TxNodesRSRP.AppendAtEnd(rxRSRP)
 					if LOG {
-						fmt.Fprintf(fid, "\n%d,%d,%5.2f,%f,%f,%t,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f", rxid, txnodeID, d3d, d2In, rxnode.Location.Z, islos, rxRSRP-txnode.TxPowerDBm, lossDb, inloss, carloss, extraloss, txnode.TxPowerDBm, BSaasgainDB, UEaasgainDB, GCSaz, GCSel, RxGCSaz, RxGCSel)
+						var lp LinkProfile
+						lp = LinkProfile{
+							RxNodeID:       link.RxNodeID,
+							TxID:           txnodeID,
+							Distance:       d3d,
+							IndoorDistance: d2In,
+							UEHeight:       rxnode.Location.Z,
+							IsLOS:          islos,
+							CouplingLoss:   rxRSRP - txnode.TxPowerDBm,
+							Pathloss:       lossDb,
+							O2I:            inloss,
+							InCar:          carloss,
+							ShadowLoss:     extraloss,
+							TxPower:        txnode.TxPowerDBm,
+							BSAasgainDB:    BSaasgainDB,
+							UEAasgainDB:    UEaasgainDB,
+							TxGCSaz:        GCSaz,
+							TxGCSel:        GCSel,
+							RxGCSaz:        RxGCSaz,
+							RxGCSel:        RxGCSel,
+						}
+						var csvstr string
+						if minilink {
+							ministruct := d3.SubStruct(lp, "RxNodeID", "TxID", "CouplingLoss")
+							csvstr, _ = vlib.Struct2String(ministruct)
+						} else {
+							csvstr, _ = vlib.Struct2String(lp)
+						}
+
+						fid.WriteString("\n" + csvstr)
+						// fmt.Fprintf(fid, "\n%d,%d,%5.2f,%f,%f,%t,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f,%f", rxid, txnodeID, d3d, d2In, rxnode.Location.Z, islos, rxRSRP-txnode.TxPowerDBm, lossDb, inloss, carloss, extraloss, txnode.TxPowerDBm, BSaasgainDB, UEaasgainDB, GCSaz, GCSel, RxGCSaz, RxGCSel)
 					}
 
 					rxdebugnode = false

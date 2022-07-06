@@ -37,6 +37,15 @@ type LinkMetric struct {
 	MaxTransmitBeamID int
 }
 
+type LinkProfile struct {
+	RxNodeID                                                                                                              int
+	TxID                                                                                                                  int
+	Distance                                                                                                              float64
+	IndoorDistance, UEHeight                                                                                              float64
+	IsLOS                                                                                                                 bool
+	CouplingLoss, Pathloss, O2I, InCar, ShadowLoss, TxPower, BSAasgainDB, UEAasgainDB, TxGCSaz, TxGCSel, RxGCSaz, RxGCSel float64
+}
+
 func (l *LinkMetric) SetParams(fGHz, bwMHz float64) {
 	// BandwidthMHz := 20.0
 	NoisePSDdBmPerHz := -173.9
